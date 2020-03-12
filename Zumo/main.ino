@@ -70,19 +70,11 @@ class Interface
 {
     public:
 
-        void activate(char line11[], char line12[], char line21[], char line22[])
+        void activate(char message1[], char message2[])
         {
-            lcd.clear();
-            lcd.print(line11);                              //Skriver første beskjed til første linje
-            lcd.gotoXY(0, 1);
-            lcd.print(line12);                              //Skriver første beskjed til andre linje
-
+            printMessage(message1);                         //Printer første instruksjon
             buttonA.waitForButton();                        //Venter til knapp A blir trykka inn
-            
-            lcd.clear();
-            lcd.print(line11);                              //Skriver andre beskjed til første linje
-            lcd.gotoXY(0, 1);
-            lcd.print(line12);                              //Skriver andre beskjed til andre linje
+            printMessage(message2);                         //Printer andre instruksjon
             
             delay(2000);                                    //Gir tid til å lese instruksjon
 
@@ -95,11 +87,7 @@ class Interface
             if (buttonA.isPressed()) {                      //Viss knapp A blir trykka inn
                 motors.setSpeeds(0, 0);                     //Stopper motorane  
                 
-                lcd.clear();                                //Ventetid mellom knappetrykk
-                lcd.clear();
-                lcd.print("Press A");
-                lcd.gotoXY(0, 1);
-                lcd.print("to start");
+                printMessage("Press A to start");           //Printer instruksjon
                 
                 delay(2000);                                //Gir tid til å slippe knappen
                 buttonA.waitForButton();                    //Venter til knapp A blir trykka inn
@@ -136,12 +124,22 @@ class Interface
         }
 
 
-        void writeTwoLines(char firstLine[], char secondLine[])
+        void printMessage(char message[])
         {
-            lcd.clear();                                        //Nullstiller LCD
-            lcd.print(firstLine);                               //Skriver første linje
-            lcd.gotoXY(0, 1);                                   //Går til første segment på nedste rad
-            lcd.print(secondLine);                              //Skriver andre linje
+            lcd.clear();
+
+            for (byte x = 0, y = 0; x < constrain(sizeof(message)-1, 0, 16); x++)   //Itererer gjennom stringen
+            {
+                if (x >= 8) {                                   //Viss stringen er lenger enn første rad
+                    y = 1;                                      //Starter på neste rad.
+                    lcd.gotoXY(x-8, y);                         
+                    lcd.print(message[x]);                      //Printer bokstav
+                }
+                else {
+                    lcd.gotoXY(x, y);
+                    lcd.print(message[x]);                      //Printer bokstav
+                }
+            }
         }
 };
 
@@ -269,9 +267,9 @@ Battery battery;                    //Instans for batteri
 
 void setup()
 {
-    intf.activate("Press A", "to cal.", "Wait for", "cal.");    //Instruerer brukar om calibrering og venter på kommando
+    intf.activate("Press A to cal.", "Wait for cal.");          //Instruerer brukar om calibrering og venter på kommando
     drive.calibrateSensors();                                   //Kalibrerer sensorane på kommando
-    intf.activate("Press A", "to start", "Press A", "to stop"); //Instruerer brukar om start og venter på kommando
+    intf.activate("Press A to start", "Press A to stop");       //Instruerer brukar om start og venter på kommando
 }
 
 
@@ -288,4 +286,3 @@ void loop()
     intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
     intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
 }
-
