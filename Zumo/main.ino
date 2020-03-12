@@ -30,7 +30,7 @@ class SelfDriving
         }
 
 
-        void followLine(int value, bool fastMode, int batteryLevel)
+        void followLine(int value, int batteryLevel, bool emergencyPower = false, bool fastMode = false)
         {
             int leftSpeed;
             int rightSpeed;
@@ -59,6 +59,11 @@ class SelfDriving
 
             leftSpeed *= batteryCorr;                   //Korrigerer med batterinivået
             rightSpeed *= batteryCorr;
+
+            if (batteryLevel <= 10 && !emergencyPower) {//Viss batterinivået er 10% og nødbatteri ikkje er aktivert
+                leftSpeed = 0;                          //Setter fartane til null
+                rightSpeed = 0;
+            }
             
             motors.setSpeeds(leftSpeed, rightSpeed);    //Setter fart til utrekna, korrigerte verdiar
         }
@@ -219,6 +224,8 @@ class Battery
     private:
 
         float batteryLvl;
+        byte emptyCounter;                                      //Antall gongar batteriet er under 10%
+
 
     public:
 
@@ -252,9 +259,18 @@ class Battery
 
             lastDistance = trip;
 
-            if (batteryLvl <= 10) ledRed(HIGH);
+            if (batteryLvl <= 10) {                             //Viss batterinivået er under 10%
+                emptyCounter += 1;                              //Inkrementerer teljar
+                ledRed(HIGH);
+            }
 
             return batteryLvl;
+        }
+
+
+        bool getEmergencyPower()
+        {
+            return (emptyCounter == 1) ? true : false;          //Får resterande batteri første gong den er under 10%
         }
 };
 
@@ -279,13 +295,12 @@ void setup()
 void loop()
 {
     int distance = motion.getTrip();                            //Henter distanse(tur) kjørt
-    int batteryLevel = battery.getBatteryLevel(distance);    //Henter batterinivå basert på distanse kjørt
+    int batteryLevel = battery.getBatteryLevel(distance);       //Henter batterinivå basert på distanse kjørt
     int position = lineSensors.readLine(lineSensorValues);      //Leser av posisjonen til zumoen 
 
-    drive.followLine(position, true, batteryLevel);             //Korrigerer retning basert på posisjon
+    drive.followLine(position, batteryLevel);                   //Korrigerer retning basert på posisjon
 
     intf.pause();                                               //Pause programmet ved å trykke A
     intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
     intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
 }
-
