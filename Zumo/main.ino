@@ -4,6 +4,8 @@ Zumo32U4Motors motors;              //Oppretter instans av motorane
 Zumo32U4Encoders encoders;          //Oppretter instans av kodarane
 Zumo32U4LineSensors lineSensors;    //Oppretter instans av linjesensorane
 Zumo32U4ButtonA buttonA;            //Oppretter instans av knapp A
+Zumo32U4ButtonB buttonB;            //Oppretter instans av knapp A
+Zumo32U4ButtonC buttonC;            //Oppretter instans av knapp A
 Zumo32U4LCD lcd;                    //Oppretter instans av LCD-display
 Zumo32U4Buzzer buzzer;              //Oppretter instans av buzzeren
 
@@ -13,6 +15,37 @@ unsigned int lineSensorValues[5];   //Verdien til kvar linjesensor
 
 class SelfDriving
 {
+    private:
+
+        int leftSpeed;
+        int rightSpeed;
+
+
+        void rotate(int degrees)
+        {
+            //Teoretisk count per meter er 909.7(2*pi*r)=7425
+
+            int counts = encoders.getCountsLeft();
+            float arcCounts = 0.267*7425*degrees/360;       //Buelengda på 360-rotasjon er 0.267m
+            
+            rightSpeed = 200*degrees/abs(degrees);          //Endrer forteiknet avhengig av forteikn på vinkel
+            leftSpeed = -rightSpeed;
+
+            motors.setSpeeds(0, 0);
+            delay(50);
+
+            while (abs(encoders.getCountsLeft() - counts) < abs(arcCounts)) {
+                motors.setSpeeds(leftSpeed, rightSpeed);
+            }
+
+            motors.setSpeeds(0, 0);
+            delay(50);
+
+            //motors.setSpeeds(leftSpeed, rightSpeed);
+            //delay(800*abs(degrees)/360);                         //Går ut ifrå 800ms ved 200 gir 360 graders rotasjon
+        }
+
+
     public:
 
         void calibrateSensors() 
@@ -32,9 +65,6 @@ class SelfDriving
 
         void followLine(int value, bool fastMode, int batteryLevel)
         {
-            int leftSpeed;
-            int rightSpeed;
-
             float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Korreksjonsfaktor for batterinivå
 
             if (fastMode) {                                             //Rask modus
@@ -62,12 +92,79 @@ class SelfDriving
             
             motors.setSpeeds(leftSpeed, rightSpeed);    //Setter fart til utrekna, korrigerte verdiar
         }
+
+
+        void square()
+        {
+            for (byte n = 0; n < 4; n++) {
+                motors.setSpeeds(200, 200);
+                delay(2000);
+                rotate(90);
+            }
+        }
+
+
+        void circle()
+        {
+            motors.setSpeeds(300, 150);
+            delay(3000);
+            motors.setSpeeds(0, 0);
+        }
+
+
+        void backAndForth()
+        {
+            motors.setSpeeds(200, 200);
+            delay(2000);
+           
+            rotate(180);
+            
+            motors.setSpeeds(200, 200);
+            delay(2000);
+            motors.setSpeeds(0, 0);
+
+        }
+
+
+        void slalom()
+        {
+            motors.setSpeeds(0, 0);
+            delay(50);
+            
+            int counts = encoders.getCountsLeft();
+            float coneCounts = 0.5*7425;            //Kjegledistanse på 0.5m
+            unsigned long time = millis();
+
+            while (encoders.getCountsLeft() - counts < coneCounts) {
+                motors.setSpeeds(200, 200);
+            }
+
+            time = millis() - time;
+            
+            for (byte i = 0; i < 10; i++){          //10 kjegler
+                rotate(90);
+                motors.setSpeeds(200, 200);
+                delay(time);
+                rotate(-90);
+                motors.setSpeeds(200, 200);
+                delay(time);
+                rotate(-90);
+                motors.setSpeeds(200, 200);
+                delay(time);
+                rotate(90);
+            }
+        }
 };
 
 
 
 class Interface
 {
+    private:
+
+        
+
+
     public:
 
         void activate(char message1[], char message2[])
@@ -141,6 +238,184 @@ class Interface
                 }
             }
         }
+
+        /*
+            if (millis() - timer > 400) {                       //Blinker kvart 400ms
+                ledRed(ledState);
+
+                ledState = !ledState;                           //Toggler tilstand
+            }
+        */
+       /*
+       void command()
+       {
+           byte i;
+           byte i[3];
+           bool statement;
+
+            while (statement) {
+                if (buttonA.isPressed()) i[0]--; 
+                if (buttonC.isPressed()) i[0]++;
+                if (buttonB.isPressed()) {
+                    while (statement) {
+                        if (buttonA.isPressed()) i[1]--; 
+                        if (buttonC.isPressed()) i[1]++;
+                        if (buttonB.isPressed()) {
+                    
+                        }
+                    }
+                }
+            }
+       }
+       */
+
+       void command()
+       {
+            isPressed = [] {
+                buttonA.isPressed() && buttonB.isPressed() && buttonC.isPressed();
+            };
+            isNotPressed = [] {
+                !buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed();
+            };
+
+            while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                //Vis instruksjonar
+                //Delay for å vente på fleire knappar
+            }
+
+            if (buttonA.isPressed() && buttonB.isPressed() && buttonC.isPressed()) {
+                buttonA.waitForRelease();
+                buttonB.waitForRelease();
+                buttonC.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonA.isPressed() && buttonB.isPressed()) {
+                buttonA.waitForRelease();
+                buttonB.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonA.isPressed() && buttonC.isPressed()) {
+                buttonA.waitForRelease();
+                buttonC.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonB.isPressed() && buttonC.isPressed()) {
+                buttonB.waitForRelease();
+                buttonC.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonA.isPressed()) {
+                buttonA.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonB.isPressed()) {
+                buttonB.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (buttonC.isPressed()) {
+                buttonC.waitForRelease();
+                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
+                    //Vis instruksjonar
+                }
+
+                if (buttonA.isPressed()) {
+               
+                }
+                if (buttonB.isPressed()) {
+
+                }
+                if (buttonC.isPressed()) {
+
+                }
+            }
+            else if (usbPowerPresent()) {
+                Serial.begin(9600);
+                while (!Serial);
+                //Vis instruksjonar
+
+                if (Serial.available()) {
+                    switch (Serial.read()) {
+                        case 'A':
+                            break;
+                    
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
 };
 
 
@@ -149,7 +424,8 @@ class Motion
 {
     private:
 
-        float speed;
+        float momSpeed;
+        float avgSpeed;
         float trip;
         float distance;
         float displacement;
@@ -162,6 +438,8 @@ class Motion
             int leftCount = encoders.getCountsAndResetLeft();           //Leser av teljarane på venstre kodar
             int rightCount = encoders.getCountsAndResetRight();         //Leser av teljarane på høgre kodar
 
+            //Teoretisk count per meter er 909.7(2*pi*r)=7425
+
             float avgDisp = (leftCount + rightCount)/(2.0*7765.0);      //Gjennomsnittlig forflytning bilen har gått
             float avgDist = abs(avgDisp);                               //Distansen er absoluttverdien av forflytninga
 
@@ -169,8 +447,14 @@ class Motion
             distance += avgDist;                                        //Akkumulerer distanse
             displacement += avgDisp;                                    //Akkumulerer forflytning
 
-            speed = avgDisp/(millis() - timer)*1000;                    //Gjennomsnittsfarta
+            momSpeed = avgDisp/(millis() - timer)*1000;                 //Momentanfarta
             timer = millis(); 
+        }
+
+
+        void calculateSpeed()
+        {
+            
         }
 
 
@@ -179,7 +463,7 @@ class Motion
         float getSpeed()
         {
             calculateMotion();          //Kalkulerer bevegelsen
-            return speed;               //Henter gjennomsnittsfart
+            return momSpeed;               //Henter gjennomsnittsfart
         }
 
 
@@ -216,23 +500,20 @@ class Battery
 {
     private:
 
-        float batteryLvl;
+        int health;
+        int cycles;
+        float level;
+        float lastTrip;
+
 
     public:
 
         void chargeBattery()
         {
-            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
             static bool ledState = HIGH;                        //Variabel som lagrer tilstand til LED
-            /*
-            if (millis() - timer > 400) {                       //Blinker kvart 400ms
-                ledRed(ledState);
-
-                ledState = !ledState;                           //Toggler tilstand
-            }
-            */
+            
             for (byte i = 0; i <= 100; i++) {
-                batteryLvl = i;
+                level = i;
 
                 ledRed(ledState);
                 ledState = !ledState;                           //Toggler tilstand
@@ -241,18 +522,14 @@ class Battery
         }
 
 
-        int getBatteryLevel(float trip, float weight = 0.0)
+        int getBatteryLevel(float trip, float weight=0, float speed=0)
         {
-            static float lastDistance = 0;
+            level = constrain(level - (trip-lastTrip)*(275+weight)/275, 0, 100);  //Rekner ut batterinivå
+            lastTrip = trip;                                                                //Lagrer siste trip
 
-            batteryLvl -= (trip-lastDistance)*((275.0+weight)/275.0);
-            if (batteryLvl < 0.0) batteryLvl = 0.0;
+            if (level <= 10) ledRed(HIGH);                 //Lyser raudt viss batteriet er under 10%
 
-            lastDistance = trip;
-
-            if (batteryLvl <= 10) ledRed(HIGH);
-
-            return batteryLvl;
+            return (int)level;                             //Returnerer batterinivå
         }
 };
 
@@ -277,7 +554,7 @@ void setup()
 void loop()
 {
     int distance = motion.getTrip();                            //Henter distanse(tur) kjørt
-    int batteryLevel = battery.getBatteryLevel(distance);    //Henter batterinivå basert på distanse kjørt
+    int batteryLevel = battery.getBatteryLevel(distance, 0);    //Henter batterinivå basert på distanse kjørt
     int position = lineSensors.readLine(lineSensorValues);      //Leser av posisjonen til zumoen 
 
     drive.followLine(position, true, batteryLevel);             //Korrigerer retning basert på posisjon
