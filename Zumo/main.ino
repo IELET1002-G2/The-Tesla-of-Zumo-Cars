@@ -239,183 +239,63 @@ class Interface
             }
         }
 
-        /*
-            if (millis() - timer > 400) {                       //Blinker kvart 400ms
-                ledRed(ledState);
+       
+        void command()
+        {
+            byte config = 0;
 
-                ledState = !ledState;                           //Toggler tilstand
-            }
-        */
-       /*
-       void command()
-       {
-           byte i;
-           byte i[3];
-           bool statement;
-
-            while (statement) {
-                if (buttonA.isPressed()) i[0]--; 
-                if (buttonC.isPressed()) i[0]++;
-                if (buttonB.isPressed()) {
-                    while (statement) {
-                        if (buttonA.isPressed()) i[1]--; 
-                        if (buttonC.isPressed()) i[1]++;
-                        if (buttonB.isPressed()) {
-                    
-                        }
-                    }
-                }
-            }
-       }
-       */
-
-       void command()
-       {
-            isPressed = [] {
-                buttonA.isPressed() && buttonB.isPressed() && buttonC.isPressed();
+            String selection[] = {
+                "Calibrate",
+                "Square",
+                "Sircle",
+                "Cones",
+                "line"
             };
-            isNotPressed = [] {
-                !buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed();
-            };
+            
+            if (buttonA.getSingleDebouncedRelease() || buttonB.getSingleDebouncedRelease() || buttonC.getSingleDebouncedRelease()) {
+                while (true) {
+                    lcd.clear();
+                    lcd.print(selection[config]);
+                    lcd.gotoXY(0, 1);
+                    lcd.print("<A B^ C>");
 
-            while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                //Vis instruksjonar
-                //Delay for å vente på fleire knappar
-            }
-
-            if (buttonA.isPressed() && buttonB.isPressed() && buttonC.isPressed()) {
-                buttonA.waitForRelease();
-                buttonB.waitForRelease();
-                buttonC.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
+                    if (buttonA.getSingleDebouncedRelease()) config--;
+                    if (buttonA.getSingleDebouncedRelease()) break;
+                    if (buttonC.getSingleDebouncedRelease()) config++;
+                    if (config < 0) config = sizeof(selection) - 2; //Må hardkode sidan kvart element i selection har ulik mengde bytes
+                    if (config > sizeof(selection) - 2) config = 0;
                 }
 
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonA.isPressed() && buttonB.isPressed()) {
-                buttonA.waitForRelease();
-                buttonB.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonA.isPressed() && buttonC.isPressed()) {
-                buttonA.waitForRelease();
-                buttonC.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonB.isPressed() && buttonC.isPressed()) {
-                buttonB.waitForRelease();
-                buttonC.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonA.isPressed()) {
-                buttonA.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonB.isPressed()) {
-                buttonB.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
-                }
-            }
-            else if (buttonC.isPressed()) {
-                buttonC.waitForRelease();
-                while (!buttonA.isPressed() && !buttonB.isPressed() && !buttonC.isPressed()) {
-                    //Vis instruksjonar
-                }
-
-                if (buttonA.isPressed()) {
-               
-                }
-                if (buttonB.isPressed()) {
-
-                }
-                if (buttonC.isPressed()) {
-
+                switch (config) {
+                    case 0:
+                        //Konfigurer
+                        break;
+                    case 1:
+                        //Konfigurer
+                        break;
+                    default:
+                        break;
                 }
             }
             else if (usbPowerPresent()) {
-                Serial.begin(9600);
+                if (!Serial) Serial.begin(9600);
                 while (!Serial);
                 //Vis instruksjonar
 
                 if (Serial.available()) {
                     switch (Serial.read()) {
                         case 'A':
+                            //Konfigurer
                             break;
-                    
+                        case 'B':
+                            //Konfigurer
+                            break;
                         default:
                             break;
                     }
                 }
-            }
-        }
+            } 
+        }           
 };
 
 
