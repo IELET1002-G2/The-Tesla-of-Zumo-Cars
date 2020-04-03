@@ -16,7 +16,8 @@ class SelfDriving
     private:
 
         unsigned int lineSensorValues[5];   //Verdien til kvar linjesensor
-
+    
+        bool sensorInitInterlock;                          //Bool to save interlock value through program
         int leftSpeed;
         int rightSpeed;
 
