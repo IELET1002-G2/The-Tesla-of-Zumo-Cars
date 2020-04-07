@@ -177,31 +177,31 @@ class Interface
         {
             static int config[] = {0, 0};                                       //Array stores mode and configuration.
             char* modes[] = {                                                   //Array with names of modes.
-                "Calib",
-                "Line",
-                "Object",
-                "Square",
-                "Circle",
-                "B and F",
-                "Slalom"    
+                "Calib",    //0: Calibrate line sensors
+                "Line",     //1: Follow line
+                "Object",   //2: Follow object
+                "Square",   //3: Drive in square pattern
+                "Circle",   //4: Drive in cirular pattern
+                "B and F",  //5: Drive forwards, turn 180D, go back
+                "Slalom"    //6: Slalom between cones
                 };
 
-            auto AorC_getSingleDebouncedRelease = [] {                         //Anonymous function that returns whether
+            auto AorC_getSingleDebouncedRelease = [] {                          //Anonymous function that returns whether
                 return                                                          //or not A or C have been pressed.
                     buttonA.getSingleDebouncedRelease() ||
                     buttonC.getSingleDebouncedRelease();
             };
 
-            auto toggle = [](byte configMenu, byte increment, byte max) {       //Anonymous function that toggles.
-                if (buttonA.getSingleDebouncedRelease()) config[configMenu] -= increment;//Toggles back to previous mode.
-                if (buttonC.getSingleDebouncedRelease()) config[configMenu] += increment;//Toggles forward to following mode.
-                if (config[configMenu] < 0) config[configMenu] = max;                             //Toggles to rightmost configuration.
-                if (config[configMenu] > max) config[configMenu] = 0;                             //Toggles to leftmost configuration.
+            auto toggle = [](byte menu, byte inc, byte max) {                   //Anonymous function that toggles.
+                if (buttonA.getSingleDebouncedRelease()) config[menu] -= inc;   //Toggles back to previous mode.
+                if (buttonC.getSingleDebouncedRelease()) config[menu] += inc;   //Toggles forward to following mode.
+                if (config[menu] < 0) config[menu] = max;                       //Toggles to rightmost configuration.
+                if (config[menu] > max) config[menu] = 0;                       //Toggles to leftmost configuration.
             };
 
-            auto getSerial = [](byte configMenu) {                              //Anonymous function that reads serial.
+            auto getSerial = [](byte menu) {                                    //Anonymous function that reads serial.
                 if (Serial && Serial.available()) {                             
-                    config[configMenu] = Serial.parseInt();                     //Gets mode or configuration from monitor.
+                    config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
                     return true;                                                //Controls flow if configuration received.
                 } 
             };
@@ -212,14 +212,14 @@ class Interface
                 
                 while (true) {                                                  //Continuously checks if somthing happens.
                     if (buttonB.getSingleDebouncedRelease()) return config;     //Continues if button B is pressed again.
-                    if (AorC_getSingleDebouncedRelease()) {                    //Any other button prompts selection of modes.
+                    if (AorC_getSingleDebouncedRelease()) {                     //Any other button prompts selection of modes.
                         enableForceConfig();
                         break;                                                  
                     }
                 } 
             }
 
-            if (AorC_getSingleDebouncedRelease() || force) {                   //Prompts selection of modes.
+            if (AorC_getSingleDebouncedRelease() || force) {                    //Prompts selection of modes.
                 config[1] = 0;                                                  //Resets configuration.
                 
                 if (usbPowerPresent() && !Serial) {
@@ -239,59 +239,58 @@ class Interface
                         );
                 }
 
-                while (true) {                                                          //Continuously checks if somthing happens.                                                     
-                    print(modes[config[0]], "<A B^ C>");                                //Prints current mode.
+                while (true) {                                                  //Continuously checks if somthing happens.                                                     
+                    print(modes[config[0]], "<A B^ C>");                        //Prints current mode.
 
-                    toggle(0, 1, 6);                                                       //Toggles mode.
+                    toggle(0, 1, 6);                                            //Toggles mode.
                                                                          
-                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) {                          //Chooses current mode.
-                        while (config[0] == 1) {                                        //Prompts line follower configuration.
-                            for (bool once = true; once && Serial; once = false) {      //Runs exactly once.
-                                Serial.print(                                           //Prints selection of configurations.
-                                    "Configure mode:\n\n"
-                                    "   0: Normal\n"
-                                    "   1: PD-regulated\n\n"
-                                    "Selected configuration: "
-                                    );
-                            }
-
-                            if (config[1] == 0) print("Normal", "<A B^ C>");            //Prints current configuration.
+                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) {  //Chooses current mode.
+                        if (config[0] == 1) {
+                            Serial.print(                                       //Prints selection of configurations.
+                                "Configure mode:\n\n"
+                                "   0: Normal\n"
+                                "   1: PD-regulated\n\n"
+                                "Selected configuration: "
+                                );
+                        }
+                        if (config[0] == 6) {
+                            Serial.print("Enter centimeters between cones: ");  //Asks for distance.
+                        }
+                        
+                        while (config[0] == 1) {                                //Prompts line follower configuration.
+                            if (config[1] == 0) print("Normal", "<A B^ C>");    //Prints current configuration.
                             if (config[1] == 1) print("PID", "<A B^ C>");
 
-                            toggle(1, 1, 1);                                               //Toggles configuration.
+                            toggle(1, 1, 1);                                    //Toggles configuration.
 
                             if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current configuration.
                         }
 
-                        while (config[0] == 6) {                                        //Prompts slalom configuration.
-                            for (bool once = true; once && Serial; once = false) {      //Runs exactly once.
-                                Serial.print("Enter centimeters between cones: ");      //Asks for distance.
-                            }
-
+                        while (config[0] == 6) {                                //Prompts slalom configuration.
                             print("cm: ", "<A B^ C>");
-                            print(config[1], 4, 0);                                     //Prints current distance between cones.
+                            print(config[1], 4, 0);                             //Prints current distance between cones.
 
-                            toggle(1, 10, 100);                                            //Toggles configuration.
+                            toggle(1, 10, 100);                                 //Toggles configuration.
 
                             if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current distance.
                         }
 
-                        break;                                                          //Leaves selection of modes.
+                        break;                                                  //Leaves selection of modes.
                     }
                 }
-            }
 
-            if (Serial) {
-                Serial.print(config[1]);
-                Serial.print(
-                    "\n\nConfiguration done.\n\n"
-                    "Press button B to activate.\n\n"
-                    );
+                if (Serial) {                                                   //Prints confirmation to monitor.
+                    Serial.print(config[1]);
+                    Serial.print(
+                        "\n\nConfiguration done.\n\n"
+                        "Press button B to activate.\n\n"
+                        );
+                }
+
+                print("Ready.", "Press B");
+                buttonB.waitForRelease();                                       //Wait for button B to be pushed.
+                lcd.clear();
             }
-                   
-            print("Ready.", "Press B");
-            buttonB.waitForRelease();
-            lcd.clear();
             
             force = false;                                      //Turns of forcing.
             return config;                                      //Returns pointer to array that stores configuration.
@@ -300,43 +299,43 @@ class Interface
 
         void print(int value, int X, int Y)
         {
-            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
+            static unsigned long timer = millis();              //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {                       //Printer ikkje oftare enn kvart 100ms for lesbarhet
+            if (millis() - timer > 100) {                       //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.gotoXY(X, Y);                               //Går til valgt posisjon på LCD
-                lcd.print(value);                               //Printer tal med decimalar
+                lcd.gotoXY(X, Y);                               //Prints to chosen position.
+                lcd.print(value);                               //Prints number without decimals.
                 
-                timer = millis();                               //Lagrer tida
+                timer = millis();                               //Saves time.
             }
         }
 
 
         void print(float value, int X, int Y)
         {
-            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
+            static unsigned long timer = millis();              //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {                       //Printer ikkje oftare enn kvart 100ms for lesbarhet
+            if (millis() - timer > 100) {                       //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.gotoXY(X, Y);                               //Går til valgt posisjon på LCD
-                lcd.print(value);                               //Printer tal utan desimalar
+                lcd.gotoXY(X, Y);                               //Prints to chosen position.
+                lcd.print(value);                               //Prints number with decimals.
                 
-                timer = millis();                               //Lagrer tida
+                timer = millis();                               //Saves time.
             }
         }
 
 
         void print(char* string1, char* string2)
         {
-            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
+            static unsigned long timer = millis();              //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {                       //Printer ikkje oftare enn kvart 100ms for lesbarhet
+            if (millis() - timer > 100) {                       //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.print(string1);                               //Printer tal utan desimalar
+                lcd.print(string1);                             //Prints text to first row.
                 lcd.gotoXY(0, 1);
-                lcd.print(string2);
+                lcd.print(string2);                             //Prints text to second row.
                 
-                timer = millis();                               //Lagrer tida
+                timer = millis();                               //Saves time.
             }
         }
 
@@ -345,16 +344,15 @@ class Interface
         {
             lcd.clear();
 
-            for (byte x = 0, y = 0; x < constrain(sizeof(message)-1, 0, 16); x++)   //Itererer gjennom stringen
+            for (byte x = 0; x < constrain(sizeof(message)-1, 0, 16); x++)  //Iterates through string.
             {
-                if (x >= 8) {                                   //Viss stringen er lenger enn første rad
-                    y = 1;                                      //Starter på neste rad.
-                    lcd.gotoXY(x-8, y);                         
-                    lcd.print(message[x]);                      //Printer bokstav
+                if (x >= 8) {                                   //If string is longer than first row.
+                    lcd.gotoXY(x-8, 1);                         //Goes to second row and resets coulumn.
+                    lcd.print(message[x]);                      //Prints character.
                 }
                 else {
-                    lcd.gotoXY(x, y);
-                    lcd.print(message[x]);                      //Printer bokstav
+                    lcd.gotoXY(x, 0);                           //Goes to new coulumn.
+                    lcd.print(message[x]);                      //Prints character.
                 }
             }
         }  
@@ -540,6 +538,8 @@ void setup() {}
 void loop()
 {
     int* config = intf.command();
+    int distance = motion.getTrip(); 
+    int batteryLevel = battery.getBatteryLevel(distance);
 
     switch (config[0]) {
         case 0:
@@ -548,9 +548,6 @@ void loop()
             break;
 
         case 1:
-            int distance = motion.getTrip();                            //Henter distanse(tur) kjørt
-            int batteryLevel = battery.getBatteryLevel(distance);       //Henter batterinivå basert på distanse kjørt
-
             drive.followLine(batteryLevel);                   //Korrigerer retning basert på posisjon
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
