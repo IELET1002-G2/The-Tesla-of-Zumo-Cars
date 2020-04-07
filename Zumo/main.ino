@@ -200,11 +200,11 @@ class Interface
             };
 
             auto getSerial = [](byte menu) {                                    //Anonymous function that reads serial.
-                if (Serial && Serial.available()) {                             
+                if (Serial && Serial.available()) {
+                    Serial.flush();                             
                     config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
                     return true;                                                //Controls flow if configuration received.
                 }
-                else return false;
             };
             
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
