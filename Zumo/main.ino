@@ -171,91 +171,11 @@ class Interface
         bool force = true;      //Variable that controls whether or not buttons are required to prompt configuration.
 
 
-        void print(char* string)
-        {
-            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
-
-            if (millis() - timer > 100) {                       //Printer ikkje oftare enn kvart 100ms for lesbarhet
-                lcd.clear();
-                lcd.print(string);                               //Printer tal utan desimalar
-                lcd.gotoXY(0, 1);
-                lcd.print("<A B^ C>");
-                
-                timer = millis();                               //Lagrer tida
-            }
-        }
-
-
     public:
 
         int* command()
         {
-            /*
-            if (usbPowerPresent() && (buttonA.isPressed() || buttonC.isPressed() || force)) {   //Prompts configuration in serial monitor.
-                if (!Serial) Serial.begin(9600);                                                //Initiates serial monitor.
-                while (!Serial);                                                                //Waits for serial communication.
-
-                Serial.print(                                                                   //Prints selection of modes on monitor.
-                    "Select mode:\n\n"
-                    "q: Quit serial communication\n"
-                    "0: Calibrate linesensors\n"
-                    "1: Line follower\n"
-                    "2: Object follower\n"
-                    "3: Square\n"
-                    "4: Circle\n"
-                    "5: Back and forth\n"
-                    "6: Slalom\n\n"
-                    );
-                
-                while (Serial) {
-                    if (Serial.available()) {                                           //If received bytes larger than zero.
-                        config[0] = Serial.parseInt();                                  //Reads integer.
-
-                        switch (config[0]) {
-                            case 'q':
-                                Serial.print("Quiting...\n\n");
-                                Serial.end();                                           //Ends serial communication.
-                                break;
-
-                            case 1:                                                     //Prompts line follower configuration.
-                                Serial.print(                                           //Prints selection of configurations.
-                                    "Configure mode:\n\n"
-                                    "   0: Normal\n"
-                                    "   1: PD-regulated\n\n"
-                                    "Selected configuration: "
-                                    );
-                                break;
-
-                            case 6:                                                     //Prompts slalom configuration.
-                                Serial.print("Enter centimeters between cones: ");      //Asks for distance.
-                                break;
-                        }
-
-                        while (Serial && (config[0] == 1 || config[0] == 6)) {          //If mode need configuration.
-                            if (Serial.available()) {
-                                config[1] = Serial.parseInt();                          //Stores configuration.
-
-                                Serial.print(config[1]);                                //Prints configuration to monitor.
-                                break;
-                            }
-                        }
-                        
-                        Serial.print(
-                            "\n\nConfiguration done.\n\n"
-                            "Press button B to activate.\n\n"
-                            );       
-                        lcd.print("Ready.");
-
-                        buttonB.waitForRelease();   //Waits for button B before initializing configuration.
-                        lcd.clear();
-                        break;        
-                    }
-                }
-            }
-            */
-
             static int config[] = {0, 0};                                       //Array stores mode and configuration.
-
             char* modes[] = {                                                   //Array with names of modes.
                 "Calib",
                 "Line",
@@ -266,32 +186,49 @@ class Interface
                 "Slalom"    
                 };
 
+            auto AorC_getSingleDebouncedRelease = [] {                         //Anonymous function that returns whether
+                return                                                          //or not A or C have been pressed.
+                    buttonA.getSingleDebouncedRelease() ||
+                    buttonC.getSingleDebouncedRelease();
+            };
+
+            auto toggle = [](byte increment, byte max) {                        //Anonymous function that toggles.
+                if (buttonA.getSingleDebouncedRelease()) config[0] -= increment;//Toggles back to previous mode.
+                if (buttonC.getSingleDebouncedRelease()) config[0] += increment;//Toggles forward to following mode.
+                if (config[1] < 0) config[1] = max;                             //Toggles to rightmost configuration.
+                if (config[1] > max) config[1] = 0;                             //Toggles to leftmost configuration.
+            };
+
+            auto getSerial = [](byte configMenu) {                              //Anonymous function that reads serial.
+                if (Serial && Serial.available()) {                             
+                    config[configMenu] = Serial.parseInt();                     //Gets mode or configuration from monitor.
+                    return true;                                                //Controls flow if configuration received.
+                } 
+            };
+            
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
-                lcd.clear();
-                lcd.print("B:cont");
-                lcd.gotoXY(0, 1);
-                lcd.print("A/C:conf");
+                motors.setSpeeds(0, 0);
+                print("B:cont", "A/C:conf");
                 
                 while (true) {                                                  //Continuously checks if somthing happens.
                     if (buttonB.getSingleDebouncedRelease()) return config;     //Continues if button B is pressed again.
-                    if (buttonA.getSingleDebouncedRelease() || buttonC.getSingleDebouncedRelease()) {
+                    if (AorC_getSingleDebouncedRelease()) {                    //Any other button prompts selection of modes.
                         enableForceConfig();
-                        break;                                                  //Any other button prompts selection of modes.
+                        break;                                                  
                     }
                 } 
             }
-            
-            if (buttonA.getSingleDebouncedRelease() || buttonC.getSingleDebouncedRelease() || force) {  //Prompts selection of modes.
-                config[1] = 0;                                                          //Resets configuration.
+
+            if (AorC_getSingleDebouncedRelease() || force) {                   //Prompts selection of modes.
+                config[1] = 0;                                                  //Resets configuration.
                 
                 if (usbPowerPresent() && !Serial) {
-                    Serial.begin(9600);                                                 //Initiates serial monitor.
+                    Serial.begin(9600);                                         //Initiates serial monitor.
                     while (!Serial);
                 }
                 if (Serial) {
-                    Serial.print(                                                       //Prints selection of modes on monitor.
+                    Serial.print(                                               //Prints selection of modes on monitor.
                         "Select mode:\n\n"
-                        "q: Quit serial communication\n"
                         "0: Calibrate linesensors\n"
                         "1: Line follower\n"
                         "2: Object follower\n"
@@ -303,13 +240,11 @@ class Interface
                 }
 
                 while (true) {                                                          //Continuously checks if somthing happens.                                                     
-                    print(modes[config[0]]);                                            //Prints current mode.
+                    print(modes[config[0]], "<A B^ C>");                                //Prints current mode.
 
-                    if (Serial && Serial.available()) config[0] = Serial.parseInt();
-
-                    if (buttonA.getSingleDebouncedRelease()) config[0]--;               //Toggles back to previous mode.
-                    if (buttonC.getSingleDebouncedRelease()) config[0]++;               //Toggles forward to following mode.
-                    if (buttonB.getSingleDebouncedRelease()) {                          //Chooses current mode.
+                    toggle(1, 6);                                                       //Toggles mode.
+                                                                         
+                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) {                          //Chooses current mode.
                         while (config[0] == 1) {                                        //Prompts line follower configuration.
                             for (bool once = true; once && Serial; once = false) {      //Runs exactly once.
                                 Serial.print(                                           //Prints selection of configurations.
@@ -320,20 +255,12 @@ class Interface
                                     );
                             }
 
-                            if (config[1] == 0) print("Normal");                        //Prints current configuration.
-                            if (config[1] == 1) print("PID");
+                            if (config[1] == 0) print("Normal", "<A B^ C>");            //Prints current configuration.
+                            if (config[1] == 1) print("PID", "<A B^ C>");
 
-                            if (Serial && Serial.available()) {
-                                config[1] = Serial.parseInt();
-                                break;
-                            } 
-                                        
-                            if (buttonA.getSingleDebouncedRelease()) config[1]--;       //Toggles back to previous configuration.
-                            if (buttonC.getSingleDebouncedRelease()) config[1]++;       //Toggles forward to following configuration.
-                            if (buttonB.getSingleDebouncedRelease()) break;             //Chooses current configuration.
+                            toggle(1, 1);                                               //Toggles configuration.
 
-                            if (config[1] < 0) config[1] = 1;                           //Toggles to rightmost configuration.
-                            if (config[1] > 1) config[1] = 0;                           //Toggles to leftmost configuration.
+                            if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current configuration.
                         }
 
                         while (config[0] == 6) {                                        //Prompts slalom configuration.
@@ -341,27 +268,16 @@ class Interface
                                 Serial.print("Enter centimeters between cones: ");      //Asks for distance.
                             }
 
-                            print("cm: ");
+                            print("cm: ", "<A B^ C>");
                             print(config[1], 4, 0);                                     //Prints current distance between cones.
 
-                            if (Serial && Serial.available()) {
-                                config[1] = Serial.parseInt();
-                                break;
-                            } 
+                            toggle(10, 100);                                            //Toggles configuration.
 
-                            if (buttonA.getSingleDebouncedRelease()) config[1] -= 10;   //Increments distance between cones.
-                            if (buttonC.getSingleDebouncedRelease()) config[1] += 10;   //Decrements distance between cones.
-                            if (buttonB.getSingleDebouncedRelease()) break;             //Chooses current distance.
-                                
-                            if (config[1] < 0) config[1] = 100;                         //Toggles to rightmost configuration.
-                            if (config[1] > 100) config[1] = 0;                         //Toggles to leftmost configuration.
+                            if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current distance.
                         }
 
                         break;                                                          //Leaves selection of modes.
                     }
-
-                    if (config[0] < 0) config[0] = 6;                                   //Toggles to rightmost mode.
-                    if (config[0] > 6) config[0] = 0;                                   //Toggles to leftmost mode.
                 }
             }
 
@@ -373,11 +289,12 @@ class Interface
                     );
             }
                    
-            printMessage("Ready.  Press B");
+            print("Ready.", "Press B");
             buttonB.waitForRelease();
+            lcd.clear();
             
-            if (force) force = false;               //Turns of forcing.
-            return config;                          //Returns pointer to array that stores configuration.
+            force = false;                                      //Turns of forcing.
+            return config;                                      //Returns pointer to array that stores configuration.
         }
 
 
@@ -403,6 +320,21 @@ class Interface
                 lcd.clear();
                 lcd.gotoXY(X, Y);                               //Går til valgt posisjon på LCD
                 lcd.print(value);                               //Printer tal utan desimalar
+                
+                timer = millis();                               //Lagrer tida
+            }
+        }
+
+
+        void print(char* string1, char* string2)
+        {
+            static unsigned long timer = millis();              //Variabel som lagrer tida for siste print
+
+            if (millis() - timer > 100) {                       //Printer ikkje oftare enn kvart 100ms for lesbarhet
+                lcd.clear();
+                lcd.print(string1);                               //Printer tal utan desimalar
+                lcd.gotoXY(0, 1);
+                lcd.print(string2);
                 
                 timer = millis();                               //Lagrer tida
             }
