@@ -114,7 +114,7 @@ class SelfDriving
         void noLineFound() 
         {
             const int threshold = 200;                      //Threshold for each sensor.
-            static int angle = 90;                          //Angle car should turn.
+            static int angle = 45;                          //Angle car should turn.
 
             if (                                            //If each value is under threshold.
                 lineSensorValues[0] < threshold &&
@@ -127,7 +127,7 @@ class SelfDriving
                 angle *= -2;                                //Changes rotation angle and direction.
             }
 
-            else angle = 90;                                //Resets angle.
+            else angle = 45;                                //Resets angle.
         }
 
 
