@@ -203,7 +203,8 @@ class Interface
                 if (Serial && Serial.available()) {                             
                     config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
                     return true;                                                //Controls flow if configuration received.
-                } 
+                }
+                else return false;
             };
             
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
@@ -222,10 +223,8 @@ class Interface
             if (AorC_getSingleDebouncedRelease() || force) {                    //Prompts selection of modes.
                 config[1] = 0;                                                  //Resets configuration.
                 
-                if (usbPowerPresent() && !Serial) {
-                    Serial.begin(9600);                                         //Initiates serial monitor.
-                    while (!Serial);
-                }
+                if (usbPowerPresent() && !Serial) Serial.begin(9600);           //Initiates serial monitor.
+
                 if (Serial) {
                     Serial.print(                                               //Prints selection of modes on monitor.
                         "Select mode:\n\n"
