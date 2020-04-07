@@ -192,11 +192,11 @@ class Interface
                     buttonC.getSingleDebouncedRelease();
             };
 
-            auto toggle = [](byte increment, byte max) {                        //Anonymous function that toggles.
-                if (buttonA.getSingleDebouncedRelease()) config[0] -= increment;//Toggles back to previous mode.
-                if (buttonC.getSingleDebouncedRelease()) config[0] += increment;//Toggles forward to following mode.
-                if (config[1] < 0) config[1] = max;                             //Toggles to rightmost configuration.
-                if (config[1] > max) config[1] = 0;                             //Toggles to leftmost configuration.
+            auto toggle = [](byte configMenu, byte increment, byte max) {       //Anonymous function that toggles.
+                if (buttonA.getSingleDebouncedRelease()) config[configMenu] -= increment;//Toggles back to previous mode.
+                if (buttonC.getSingleDebouncedRelease()) config[configMenu] += increment;//Toggles forward to following mode.
+                if (config[configMenu] < 0) config[configMenu] = max;                             //Toggles to rightmost configuration.
+                if (config[configMenu] > max) config[configMenu] = 0;                             //Toggles to leftmost configuration.
             };
 
             auto getSerial = [](byte configMenu) {                              //Anonymous function that reads serial.
@@ -242,7 +242,7 @@ class Interface
                 while (true) {                                                          //Continuously checks if somthing happens.                                                     
                     print(modes[config[0]], "<A B^ C>");                                //Prints current mode.
 
-                    toggle(1, 6);                                                       //Toggles mode.
+                    toggle(0, 1, 6);                                                       //Toggles mode.
                                                                          
                     if (buttonB.getSingleDebouncedRelease() || getSerial(0)) {                          //Chooses current mode.
                         while (config[0] == 1) {                                        //Prompts line follower configuration.
@@ -258,7 +258,7 @@ class Interface
                             if (config[1] == 0) print("Normal", "<A B^ C>");            //Prints current configuration.
                             if (config[1] == 1) print("PID", "<A B^ C>");
 
-                            toggle(1, 1);                                               //Toggles configuration.
+                            toggle(1, 1, 1);                                               //Toggles configuration.
 
                             if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current configuration.
                         }
@@ -271,7 +271,7 @@ class Interface
                             print("cm: ", "<A B^ C>");
                             print(config[1], 4, 0);                                     //Prints current distance between cones.
 
-                            toggle(10, 100);                                            //Toggles configuration.
+                            toggle(1, 10, 100);                                            //Toggles configuration.
 
                             if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current distance.
                         }
