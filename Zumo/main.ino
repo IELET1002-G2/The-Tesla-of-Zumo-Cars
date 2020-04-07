@@ -111,6 +111,26 @@ class SelfDriving
 
     public:
 
+        void noLineFound() 
+        {
+            const int threshold = 200;                      //Threshold for each sensor.
+            static int angle = 90;                          //Angle car should turn.
+
+            if (                                            //If each value is under threshold.
+                lineSensorValues[0] < threshold &&
+                lineSensorValues[1] < threshold &&
+                lineSensorValues[2] < threshold &&
+                lineSensorValues[3] < threshold &&
+                lineSensorValues[4] < threshold
+                ) {
+                rotate(angle);                              //Rotates an altering amount of degrees.
+                angle *= -2;                                //Changes rotation angle and direction.
+            }
+
+            else angle = 90;                                //Resets angle.
+        }
+
+
         void calibrateSensors() 
         {
             lineSensors.initFiveSensors();                  //Starter 5-linjesensorkonfigurasjonen
@@ -636,6 +656,8 @@ void loop()
 
             if (config[1] == 0) drive.followLine(batteryLevel);         //Korrigerer retning basert på posisjon
             else drive.followLinePD(300, batteryLevel);
+
+            drive.noLineFound();
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
