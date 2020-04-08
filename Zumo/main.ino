@@ -238,6 +238,8 @@ class Interface
                         );
                 }
 
+                while (Serial.available()) Serial.parseInt();
+
                 while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(modes[config[0]], "<A B^ C>");                        //Prints current mode.
 
