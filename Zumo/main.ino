@@ -19,6 +19,8 @@ class SelfDriving
 
         int leftSpeed;
         int rightSpeed;
+        bool rotDone = false;                                  //Bool needed in noLineFound method, to know if car has turned or not
+        const int threshold = 200;                             //Threshold for line sensors
 
 
         void rotate(int degrees)
@@ -111,23 +113,81 @@ class SelfDriving
 
     public:
 
-        void noLineFound() 
+        bool noLine()
         {
-            const int threshold = 200;                      //Threshold for each sensor.
-            static int angle = 45;                          //Angle car should turn.
-
-            if (                                            //If each value is under threshold.
-                lineSensorValues[0] < threshold &&
-                lineSensorValues[1] < threshold &&
+            if (
+                lineSensorValues[0] < threshold &&          //While each value is under threshold, return true
+                lineSensorValues[1] < threshold &&          //If line is found, return false
                 lineSensorValues[2] < threshold &&
                 lineSensorValues[3] < threshold &&
                 lineSensorValues[4] < threshold
+            ) {
+                return true;
+            }
+            else return false;
+
+        }
+        
+        
+        void noLineFound() 
+        {
+            //const int threshold = 200;                      //Threshold for each sensor.
+            //static int angle = 45;                          //Angle car should turn.
+            const unsigned long timeThreshold = 2000;       //Time interval before car should rotate 180 deg and go back
+            //static bool rotDone;                            //Bool to know if car has turned around or not
+            static unsigned long timeStart = millis();      //Time since no line was found
+
+            while (                                         //While each value is under threshold and time interval has not passed, drive straight
+                noLine() &&                                 //If the line was found within 2 seconds, the car follows line as normal
+                //!rotDone &&
+                (millis() - timeStart) < timeThreshold
                 ) {
-                rotate(angle);                              //Rotates an altering amount of degrees.
-                angle *= -2;                                //Changes rotation angle and direction.
+                motors.setSpeeds(200, 200);             
             }
 
+            delay(10);                                      //Small delay to trigger if statement if true
+
+            if ((millis() - timeStart) > timeThreshold /*&& !rotDone*/)
+            {
+                rotate(180);                                //Rotates to go back to intersection
+                motors.setSpeeds(200, 200);
+                //rotDone = true;                             //The car has turned, prevent from turning again when arriving intersection
+            }
+
+            while ((millis() - timeStart) > timeThreshold)
+            {
+                if (!noLine()) {
+                    break;
+                }
+            }
+            
+            /*
+            if (
+                lineSensorValues[0] > threshold &&
+                lineSensorValues[4] < threshold &&
+                lineSensorValues[2] > threshold &&
+                rotDone
+                ) {
+                    rotate(-90);
+                }                                           //Trur nok dette if/else statementet ikkje er naudsynt, sidan noLine vil returne true når
+                                                            //bilen ser ei line, og då vil vel PD-en take over når snu bilen riktig plass
+            else if (                                       //i svingen?
+                lineSensorValues[0] < threshold &&
+                lineSensorValues[4] > threshold &&
+                lineSensorValues[2] > threshold &&
+                rotDone
+                ) {
+                    rotate(90);
+                }
+            */
+
+            /*    
+                rotate(angle);                              //Rotates an altering amount of degrees.
+                angle *= -2;                                //Changes rotation angle and direction.
+            
+
             else angle = 45;                                //Resets angle.
+            */
         }
 
 
@@ -651,13 +711,13 @@ void loop()
             break;
 
         case 1:
-            distance = motion.getTrip();                          //Henter distanse(tur) kjørt
-            batteryLevel = battery.getBatteryLevel(distance);       //Henter batterinivå basert på distanse kjørt
+            distance = motion.getTrip();                                //Henter distanse(tur) kjørt
+            batteryLevel = battery.getBatteryLevel(distance);           //Henter batterinivå basert på distanse kjørt
 
             if (config[1] == 0) drive.followLine(batteryLevel);         //Korrigerer retning basert på posisjon
             else drive.followLinePD(300, batteryLevel);
 
-            drive.noLineFound();
+            while (drive.noLine()) drive.noLineFound();
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
