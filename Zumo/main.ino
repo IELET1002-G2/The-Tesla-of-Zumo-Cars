@@ -205,7 +205,7 @@ class Interface
                     config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
                     return true;                                                //Controls flow if configuration received.
                 }
-                else return false;
+                return false;
             };
             
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
