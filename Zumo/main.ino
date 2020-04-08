@@ -205,6 +205,7 @@ class Interface
                     config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
                     return true;                                                //Controls flow if configuration received.
                 }
+                else return false;
             };
             
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
@@ -238,7 +239,10 @@ class Interface
                         );
                 }
 
-                while (Serial.available()) Serial.parseInt();
+                while (Serial.available()) {
+                    Serial.parseInt(); 
+                    Serial.read();
+                }
 
                 while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(modes[config[0]], "<A B^ C>");                        //Prints current mode.
