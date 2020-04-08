@@ -167,7 +167,7 @@ class SelfDriving
 class Interface
 {
     private:
-        //bool flag = false;
+
         bool force = true;      //Variable that controls whether or not buttons are required to prompt configuration.
 
 
@@ -175,7 +175,6 @@ class Interface
 
         int* command()
         {
-            static bool flag = false;
             static int config[] = {0, 0};                                       //Array stores mode and configuration.
             char* modes[] = {                                                   //Array with names of modes.
                 "Calib",    //0: Calibrate line sensors
@@ -185,6 +184,11 @@ class Interface
                 "Circle",   //4: Drive in cirular pattern
                 "B and F",  //5: Drive forwards, turn 180D, go back
                 "Slalom"    //6: Slalom between cones
+                };
+
+            char* lineFollower[] = {
+                "Normal",   //0: Polynomial regulated
+                "PD"        //1: PD regulated
                 };
 
             auto AorC_getSingleDebouncedRelease = [] {                          //Anonymous function that returns whether
@@ -201,12 +205,12 @@ class Interface
             };
 
             auto getSerial = [](byte menu) {                                    //Anonymous function that reads serial.
-                if (Serial && Serial.available()) {
+                if (Serial.available()) {
                     Serial.flush();                             
                     config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
-                    flag = true;                                                //Controls flow if configuration received.
+                    return true;                                                //Controls flow if configuration received.
                 }
-                //else flag = false;
+                return false;
             };
             
             if (buttonB.getSingleDebouncedRelease()) {                          //Pauses if button B is pressed.
@@ -241,6 +245,7 @@ class Interface
                 }
 
                 while (Serial.available()) {
+                    Serial.flush();
                     Serial.parseInt(); 
                     Serial.read();
                 }
@@ -249,10 +254,8 @@ class Interface
                     print(modes[config[0]], "<A B^ C>");                        //Prints current mode.
 
                     toggle(0, 1, 6);                                            //Toggles mode.
-                    getSerial(0);
-
-                    if (buttonB.getSingleDebouncedRelease() || flag) {  //Chooses current mode.
-                        flag = false;
+                                                                         
+                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) {  //Chooses current mode.
                         if (config[0] == 1) {
                             Serial.print(                                       //Prints selection of configurations.
                                 "Configure mode:\n\n"
@@ -266,13 +269,11 @@ class Interface
                         }
                         
                         while (config[0] == 1) {                                //Prompts line follower configuration.
-                            if (config[1] == 0) print("Normal", "<A B^ C>");    //Prints current configuration.
-                            if (config[1] == 1) print("PID", "<A B^ C>");
+                            print(lineFollower[config[1]], "<A B^ C>");         //Prints current configuration.
 
                             toggle(1, 1, 1);                                    //Toggles configuration.
-                            getSerial(1);
 
-                            if (buttonB.getSingleDebouncedRelease() || flag) break; //Chooses current configuration.
+                            if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current configuration.
                         }
 
                         while (config[0] == 6) {                                //Prompts slalom configuration.
@@ -280,8 +281,8 @@ class Interface
                             print(config[1], 4, 0);                             //Prints current distance between cones.
 
                             toggle(1, 10, 100);                                 //Toggles configuration.
-                            getSerial(1);
-                            if (buttonB.getSingleDebouncedRelease() || flag) break; //Chooses current distance.
+
+                            if (buttonB.getSingleDebouncedRelease() || getSerial(1)) break; //Chooses current distance.
                         }
 
                         break;                                                  //Leaves selection of modes.
@@ -300,7 +301,7 @@ class Interface
                 buttonB.waitForRelease();                                       //Wait for button B to be pushed.
                 lcd.clear();
             }
-            flag = false;
+            
             force = false;                                      //Turns of forcing.
             return config;                                      //Returns pointer to array that stores configuration.
         }
