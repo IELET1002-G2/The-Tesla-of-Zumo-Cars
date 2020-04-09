@@ -19,7 +19,7 @@ class SelfDriving
 
         int leftSpeed;
         int rightSpeed;
-        const int threshold = 200;                             //Threshold for line sensors
+        const int threshold = 300;                             //Threshold for line sensors
 
 
         void rotate(int degrees)
@@ -138,29 +138,9 @@ class SelfDriving
             if (millis() - timeStart > timeThreshold)       //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
             {
                 rotate(180);
-                motors.setSpeeds(200, 200);
-                timeStart = millis();                       //Update timeStart so car does not turn around again
+                line(1500);                                 //Drive straight back for 1500 ms after rotation
+                timeStart = millis();                       //Update timeStart so car does not turn around again while still no line is found
             }
-
-            /*
-            if (noLine() && (millis() - timeStart) < timeThreshold))    //If each value is under threshold and time interval has not passed, continue driving
-            {                                                           //If the line was found within 2 seconds, the car follows line as normal
-                return;             
-            }
-
-            if ((millis() - timeStart) > timeThreshold)
-            {
-                rotate(180);                                //Rotates to go back to intersection
-                motors.setSpeeds(200, 200);
-            }
-
-            while ((millis() - timeStart) > timeThreshold)
-            {
-                if (!noLine()) {
-                    break;
-                }
-            }
-            */
         }
 
 
