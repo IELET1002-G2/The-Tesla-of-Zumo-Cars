@@ -294,14 +294,14 @@ class Interface
                     Serial.parseInt();
                 }
 
-                Serial.println("xxxxxxxxxxxxxx");
-                Serial.println(getSerial(0));
-                Serial.println("xxxxxxxxxxxxxx");
+                //Serial.println("xxxxxxxxxxxxxx");
+                //Serial.println(getSerial(0));
+                //Serial.println("xxxxxxxxxxxxxx");
 
                 while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(MODES[config[0]], "<A B^ C>");                        //Prints current mode.
                     toggleConfig(0, 1, 6);                                      //Toggles mode.                                                    
-                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) break;  //Chooses current mode. 
+                    if (buttonB.getSingleDebouncedRelease()) break;  //Chooses current mode.  || getSerial(0)
                 }
 
                 if (Serial) {
@@ -333,7 +333,7 @@ class Interface
                         print(config[1], 4, 0);                                 //Prints current distance between cones.
                         toggleConfig(1, 10, 100);                               //Toggles configuration.
                     }
-                    if (buttonB.getSingleDebouncedRelease() || getSerial(1)) {
+                    if (buttonB.getSingleDebouncedRelease()) { // || getSerial(1)
                         if (Serial) Serial.print(config[1]);                    //Prints confirmation to monitor.
                         break;                                                  //Chooses current configuration.
                     }
