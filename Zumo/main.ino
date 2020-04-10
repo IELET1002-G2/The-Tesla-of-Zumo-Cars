@@ -61,7 +61,7 @@ class SelfDriving
 
         long line(long integral, int speed)
         {
-            while(!gyro.readReg(L3G::STATUS_REG));                  //Wait for new available
+            while(!gyro.readReg(gyro.STATUS_REG));                  //Wait for new available
             gyro.read();                                            //Read latest gyro data
 
             long g = gyro.g.z - gyroNoise;
@@ -83,8 +83,8 @@ class SelfDriving
 
             int adjust = 0.4*error + 2.0*(error-last);                  //Adjustment based on error and deriavative
 
-            int left = constrain(speed - adjust, -400, 400);            //Left motor speed based on adjustment
-            int right = constrain(speed + adjust, -400, 400);           //Right motor speed based on adjustment
+            int left = constrain(speed - adjust, -350, 350);            //Left motor speed based on adjustment
+            int right = constrain(speed + adjust, -350, 350);           //Right motor speed based on adjustment
 
             if (batteryLevel <= 10 && !emergencyPower) {                //If battery level is to low, stop motors
                 left = 0;                          
@@ -166,7 +166,7 @@ class SelfDriving
 
             for (int i = 0; i < 100; i++)
             {
-                while(!gyro.readReg(L3G::STATUS_REG));
+                while(!gyro.readReg(gyro.STATUS_REG));
                 gyro.read();
                 gyroNoise += gyro.g.z; 
             }
@@ -709,7 +709,7 @@ void loop()
 
             if (drive.noLineFound());
             if (config[1] == 0) drive.followLine(batteryLevel);    //Korrigerer retning basert på posisjon
-            else drive.followLinePD(250, batteryLevel);
+            else drive.followLinePD(300, batteryLevel);
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
