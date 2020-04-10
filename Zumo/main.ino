@@ -1,4 +1,6 @@
-#include <Zumo32U4.h>               //Importerer Zumo-biblioteket
+#include <Zumo32U4.h>
+#include <Wire.h>
+#include <LSM303.h>
 
 Zumo32U4Motors motors;              //Oppretter instans av motorane
 Zumo32U4Encoders encoders;          //Oppretter instans av kodarane
@@ -8,6 +10,7 @@ Zumo32U4ButtonB buttonB;            //Oppretter instans av knapp A
 Zumo32U4ButtonC buttonC;            //Oppretter instans av knapp A
 Zumo32U4LCD lcd;                    //Oppretter instans av LCD-display
 Zumo32U4Buzzer buzzer;              //Oppretter instans av buzzeren
+L3G gyro;                           //Oppretter instans av gyroskop
 
 
 
@@ -19,6 +22,7 @@ class SelfDriving
 
         int leftSpeed;
         int rightSpeed;
+        long gyroNoise = 0;
         const int threshold = 300;                             //Threshold for line sensors
 
 
@@ -55,37 +59,20 @@ class SelfDriving
         }
 
 
-        int encoderPD(int leftStart, int rightStart, int last)
+        long line(long integral, int speed)
         {
-            int left = encoders.getCountsLeft() - leftStart;        //Left counts since start
-            int right = encoders.getCountsRight() - rightStart;     //Right counts since start
-            int err = left - right;                                 //Error based on difference in counts
-            
-            int adjust = 0.5*err + 0.1*(err - last);                //Calculates weighted adjustment
+            while(!gyro.readReg(L3G::STATUS_REG));                  //Wait for new available
+            gyro.read();                                            //Read latest gyro data
 
-            left = constrain(200 - adjust, -400, 400);              //New left speed
-            right = constrain(200 + adjust, -400, 400);             //New right speed
-            
-            motors.setSpeeds(left, right);                          //Set motor speeds
+            long g = gyro.g.z - gyroNoise;
 
-            return err;                                             //Return error for next deriavative
-        }
-
-
-        void line(unsigned long time) 
-        {
-            unsigned long start = millis();                             //Store start time
-
-            int leftCounter = encoders.getCountsLeft();                 //Start counts left
-            int rightCounter = encoders.getCountsRight();               //Start counts right
-
-            while (millis() - start < time)                             //Drives forward for set amount of time
+            if (g > 80 || g < -80)
             {
-                static int last = 0;
-                last = encoderPD(leftCounter, rightCounter, last);      //Adjusts motor speeds and stores return value
+                integral += g;
+                int adjust = 0.015 * g + 0.002 * integral;
+                motors.setSpeeds(speed + adjust, speed - adjust);
             }
-            motors.setSpeeds(0,0);                                      //Stops motors at end of time period
-            delay(50);                                                  //Delay to get rid of momentum
+            return integral;
         }
 
 
@@ -112,6 +99,20 @@ class SelfDriving
 
     public:
 
+        bool turnDetect()
+        {
+            static unsigned long lastTurn = 0;
+            lineSensors.readLine(lineSensorValues);
+            if (lineSensorValues[0] > threshold || lineSensorValues[4] > threshold)
+            {
+                lastTurn = millis();
+                return true;
+            }
+            if (millis() - lastTurn < 1500) return true;
+            return false;
+        }
+
+
         bool noLine()
         {
             if (
@@ -123,24 +124,33 @@ class SelfDriving
             ) {
                 return true;
             }
-            else return false;
+            return false;
 
         }
         
         
-        void noLineFound()                                  //Car has 2 seconds to find, and find back to, line if no line is detected
+        bool noLineFound()                                  //Car has 2 seconds to find, and find back to, line if no line is detected
         {
             const unsigned long timeThreshold = 2000;       //Time interval before car should rotate 180 deg and go back
             static unsigned long timeStart = millis();      //Time since no line was found
+            static long integral = 0;
 
-            if (!noLine()) timeStart = millis();            //If line is found, update timeStart so car does not turn around
+            
+            if (turnDetect() || !noLine()) {
+                timeStart = millis();                       //If line is found, update timeStart so car does not turn around
+                integral = 0;
+                return false;
+            }
 
             if (millis() - timeStart > timeThreshold)       //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
             {
                 rotate(180);
-                line(1500);                                 //Drive straight back for 1500 ms after rotation
                 timeStart = millis();                       //Update timeStart so car does not turn around again while still no line is found
+                integral = 0;
+                motors.setSpeeds(200, 200);
             }
+            integral = line(integral, 250);
+            return true;
         }
 
 
@@ -148,7 +158,22 @@ class SelfDriving
         {
             lineSensors.initFiveSensors();                  //Starter 5-linjesensorkonfigurasjonen
 
+            Wire.begin();
+            gyro.init();
+            gyro.enableDefault();
+
+            delay(500);
+
+            for (int i = 0; i < 100; i++)
+            {
+                while(!gyro.readReg(L3G::STATUS_REG));
+                gyro.read();
+                gyroNoise += gyro.g.z; 
+            }
+            gyroNoise /= 100;
+
             for (int t = 0; t <= 200; t++) {                //Varer i 4000ms der t er tid i ms
+
                 lineSensors.calibrate();                    //Kalibrerer sensor
 
                 int speed = 400*sin(PI/100*t);              //Farten er beskrive av sinus-uttrykk med periode 4000ms
@@ -196,19 +221,26 @@ class SelfDriving
         }
 
 
-        void followLinePD(int speed, int batteryLevel)
+        void followLinePD(int s, int batteryLevel)
         {
             static int last = 0;
-            int position = lineSensors.readLine(lineSensorValues);  //Reads position from lineSensors
-            last = PD(position, last, speed, batteryLevel);         //Adjusts motors based on position and stores return value
+            int p = lineSensors.readLine(lineSensorValues);  //Reads position from lineSensors
+            last = PD(p, last, s, batteryLevel);         //Adjusts motors based on position and stores return value
         }
 
 
         void square()
         {
             for (byte n = 0; n < 4; n++) {
-                line(3000);                             //Drive forward
-                rotate(90);                             //Turn 90 degrees
+                long integral = 0;
+                unsigned long timer = millis();
+
+                motors.setSpeeds(200, 200);
+                while (millis() - timer < 1000)  integral = line(integral, 200);
+
+                motors.setSpeeds(0,0);
+                delay(500);
+                rotate(90);
             }
         }
 
@@ -223,9 +255,17 @@ class SelfDriving
 
         void backAndForth()
         {
-            line(3000);                             //Drive forward
-            rotate(180);                            //Turn 180 degrees
-            line(3000);                             //Drive back to origin
+            for (byte i = 0; i < 2; i++)
+            {
+                long integral = 0;
+                unsigned long timer = millis();
+
+                motors.setSpeeds(200, 200);
+                while (millis() - timer < 2000) integral = line(integral, 200);
+                motors.setSpeeds(0, 0);
+            
+                rotate(180);
+            }
         }
 
 
@@ -667,10 +707,9 @@ void loop()
             distance = motion.getTrip();                                //Henter distanse(tur) kjørt
             batteryLevel = battery.getBatteryLevel(distance);           //Henter batterinivå basert på distanse kjørt
 
-            if (config[1] == 0) drive.followLine(batteryLevel);         //Korrigerer retning basert på posisjon
-            else drive.followLinePD(300, batteryLevel);
-
-            drive.noLineFound();
+            if (drive.noLineFound());
+            if (config[1] == 0) drive.followLine(batteryLevel);    //Korrigerer retning basert på posisjon
+            else drive.followLinePD(250, batteryLevel);
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
@@ -701,7 +740,6 @@ void loop()
             break;
 
         default:
-            intf.enableForceConfig();
             break;
     }
 }
