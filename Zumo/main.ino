@@ -1,13 +1,14 @@
-#include <Zumo32U4.h>               //Importerer Zumo-biblioteket
+#include <Zumo32U4.h>                   //Importerer Zumo-biblioteket
 
-Zumo32U4Motors motors;              //Oppretter instans av motorane
-Zumo32U4Encoders encoders;          //Oppretter instans av kodarane
-Zumo32U4LineSensors lineSensors;    //Oppretter instans av linjesensorane
-Zumo32U4ButtonA buttonA;            //Oppretter instans av knapp A
-Zumo32U4ButtonB buttonB;            //Oppretter instans av knapp A
-Zumo32U4ButtonC buttonC;            //Oppretter instans av knapp A
-Zumo32U4LCD lcd;                    //Oppretter instans av LCD-display
-Zumo32U4Buzzer buzzer;              //Oppretter instans av buzzeren
+Zumo32U4Motors motors;                  //Oppretter instans av motorane
+Zumo32U4Encoders encoders;              //Oppretter instans av kodarane
+Zumo32U4LineSensors lineSensors;        //Oppretter instans av linjesensorane
+Zumo32U4ButtonA buttonA;                //Oppretter instans av knapp A
+Zumo32U4ButtonB buttonB;                //Oppretter instans av knapp A
+Zumo32U4ButtonC buttonC;                //Oppretter instans av knapp A
+Zumo32U4LCD lcd;                        //Oppretter instans av LCD-display
+Zumo32U4Buzzer buzzer;                  //Oppretter instans av buzzeren
+Zumo32U4ProximitySensors proxSensors;   //Create instance of the proximity sensors
 
 
 
@@ -15,34 +16,98 @@ class SelfDriving
 {
     private:
 
-        unsigned int lineSensorValues[5];   //Verdien til kvar linjesensor
+        unsigned int lineSensorValues[5];                       //Verdien til kvar linjesensor
 
+        bool sensorInitInterlock;                               //Bool to save interlock value through program
         int leftSpeed;
         int rightSpeed;
 
 
         void rotate(int degrees)
         {
-            //Teoretisk count per meter er 909.7(2*pi*r)=7425
+            float arcCounts = 7.63125*degrees;                  //Calibrated number of counts for given angle
 
-            int counts = encoders.getCountsLeft();
-            float arcCounts = 0.267*7425*degrees/360;       //Buelengda på 360-rotasjon er 0.267m
-            
-            rightSpeed = 200*degrees/abs(degrees);          //Endrer forteiknet avhengig av forteikn på vinkel
-            leftSpeed = -rightSpeed;
+            int leftStart = encoders.getCountsLeft();           //Start counts left
+            int rightStart = encoders.getCountsRight();         //Start counts right
 
-            motors.setSpeeds(0, 0);
-            delay(50);
+            int sum = 0;
 
-            while (abs(encoders.getCountsLeft() - counts) < abs(arcCounts)) {
-                motors.setSpeeds(leftSpeed, rightSpeed);
+            motors.setSpeeds(0, 0);                             //Stop motor before rotation
+            delay(50);                                          //Delay to get rid of momentum
+
+            while (encoders.getCountsRight() - rightStart < arcCounts) 
+            {
+                int left = encoders.getCountsLeft() - leftStart;        //Left counts since start
+                int right = encoders.getCountsRight() - rightStart;     //Right counts since start
+                int err = left + right;                                 //Error based on difference in counts
+
+                sum += err;                                             //Integral of error
+                
+                int adjust = 0.1*err + 0.001*sum;                       //Calculates weighted adjustment
+
+                left = constrain(-200 + adjust, -400, 400);             //New left speed
+                right = constrain(200 - adjust, -400, 400);             //New right speed
+                
+                motors.setSpeeds(left, right);                          //Set motor speeds
             }
 
-            motors.setSpeeds(0, 0);
-            delay(50);
+            motors.setSpeeds(0, 0);                                     //Stop motors after rotation
+            delay(50);                                                  //Delay to get rid of momentum
+        }
 
-            //motors.setSpeeds(leftSpeed, rightSpeed);
-            //delay(800*abs(degrees)/360);                         //Går ut ifrå 800ms ved 200 gir 360 graders rotasjon
+
+        int encoderPD(int leftStart, int rightStart, int last)
+        {
+            int left = encoders.getCountsLeft() - leftStart;        //Left counts since start
+            int right = encoders.getCountsRight() - rightStart;     //Right counts since start
+            int err = left - right;                                 //Error based on difference in counts
+            
+            int adjust = 0.5*err + 0.1*(err - last);                //Calculates weighted adjustment
+
+            left = constrain(200 - adjust, -400, 400);              //New left speed
+            right = constrain(200 + adjust, -400, 400);             //New right speed
+            
+            motors.setSpeeds(left, right);                          //Set motor speeds
+
+            return err;                                             //Return error for next deriavative
+        }
+
+
+        void line(unsigned long time) 
+        {
+            unsigned long start = millis();                             //Store start time
+
+            int leftCounter = encoders.getCountsLeft();                 //Start counts left
+            int rightCounter = encoders.getCountsRight();               //Start counts right
+
+            while (millis() - start < time)                             //Drives forward for set amount of time
+            {
+                static int last = 0;
+                last = encoderPD(leftCounter, rightCounter, last);      //Adjusts motor speeds and stores return value
+            }
+            motors.setSpeeds(0,0);                                      //Stops motors at end of time period
+            delay(50);                                                  //Delay to get rid of momentum
+        }
+
+
+        int PD(int input, int last, int speed, int batteryLevel = 100, bool emergencyPower = false)
+        {
+            int error = 2000 - input;                                   //Converts position to error based on desired position
+            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction for battey level
+
+            int adjust = 0.4*error + 2.0*(error-last);                  //Adjustment based on error and deriavative
+
+            int left = constrain(speed - adjust, -400, 400);            //Left motor speed based on adjustment
+            int right = constrain(speed + adjust, -400, 400);           //Right motor speed based on adjustment
+
+            if (batteryLevel <= 10 && !emergencyPower) {                //If battery level is to low, stop motors
+                left = 0;                          
+                right = 0;
+            }
+
+            motors.setSpeeds(left*batteryCorr, right*batteryCorr);      //Set speeds adjusted for battery level
+
+            return error;                                               //Return error for next deriavative
         }
 
 
@@ -50,6 +115,8 @@ class SelfDriving
 
         void calibrateSensors() 
         {
+            sensorInitInterlock = false;                    //Linesensors is now configured, no need to do it again 
+                                                            //unless prox. sensors config has been run
             lineSensors.initFiveSensors();                  //Starter 5-linjesensorkonfigurasjonen
 
             for (int t = 0; t <= 200; t++) {                //Varer i 4000ms der t er tid i ms
@@ -65,6 +132,12 @@ class SelfDriving
 
         void followLine(int batteryLevel, bool emergencyPower = false, bool fastMode = false)
         {
+            if (sensorInitInterlock) { 
+                lineSensors.initFiveSensors(); 
+
+                sensorInitInterlock = false;                            //If followObject() is called after followLine() has been called, initFrontSensor  
+            } 
+
             int value = lineSensors.readLine(lineSensorValues);         //Leser av posisjonen til zumoen 
             float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Korreksjonsfaktor for batterinivå
 
@@ -100,12 +173,59 @@ class SelfDriving
         }
 
 
+        void followLinePD(int speed, int batteryLevel)
+        {
+            static int last = 0;
+            int position = lineSensors.readLine(lineSensorValues);  //Reads position from lineSensors
+            last = PD(position, last, speed, batteryLevel);         //Adjusts motors based on position and stores return value
+        }
+
+
+        void followObject()                             //Follow an object within prox. sensor range (~30-40 cm) as it would follow lines on ground
+        {
+            if (!sensorInitInterlock) { 
+                proxSensors.initFrontSensor();          //Need to call this function in order to use the front prox. sensor
+                                                        //Can only use front when full line sensor array in use, ref. p. 20 in Pololu User Guide
+                sensorInitInterlock = true;             //Init interlock, if followLine() is called after followObject() has been called, initFiveSensors
+            }                       
+
+            int driveSpeed = 150;
+            int turnSpeed = 300;
+
+            proxSensors.read();                                          //Function that reads reflected IR from nearby object, takes ~ 3 ms to run
+
+            int leftReading = proxSensors.countsFrontWithLeftLeds();     //Returns an integer based on reflected IR light
+            int rightReading = proxSensors.countsFrontWithRightLeds();
+
+            while (((leftReading + rightReading)) / 2 < 4) {             //As long as no object is detected (object is ~ 140 cm from Zumo), turn until detected
+                proxSensors.read();                                      //Read sensor values for every iteration of the while loop
+
+                motors.setSpeeds(turnSpeed, 0);
+
+                leftReading = proxSensors.countsFrontWithLeftLeds();     //Get value from front left prox. sensor
+                rightReading = proxSensors.countsFrontWithRightLeds();   //Get value from front right prox. sensor
+
+                if(leftReading >= 4 || rightReading >= 4) {              //If the sensor detected something (within ~ 140 cm range), stop turning and exit while loop
+                    motors.setSpeeds(0,0);
+                    delay(30);                                           //Motor safety delay time
+                }
+            }
+
+            if ((leftReading > 5) || (rightReading > 5)) motors.setSpeeds(0, 0);                     //Object must be very close (less than 30 cm) to an object, stop motors as a preventive measure 
+
+            else if (leftReading > rightReading) motors.setSpeeds(driveSpeed, turnSpeed);            //Object is to the left, turn left 
+
+            else if (leftReading < rightReading) motors.setSpeeds(turnSpeed, driveSpeed);            //Objct is to the right, turn right
+
+            else motors.setSpeeds(driveSpeed, driveSpeed);                                           //Object is directly in front of Zumo, drive towards object 
+        }
+
+
         void square()
         {
             for (byte n = 0; n < 4; n++) {
-                motors.setSpeeds(200, 200);
-                delay(2000);
-                rotate(90);
+                line(3000);                             //Drive forward
+                rotate(90);                             //Turn 90 degrees
             }
         }
 
@@ -120,15 +240,9 @@ class SelfDriving
 
         void backAndForth()
         {
-            motors.setSpeeds(200, 200);
-            delay(2000);
-           
-            rotate(180);
-            
-            motors.setSpeeds(200, 200);
-            delay(2000);
-            motors.setSpeeds(0, 0);
-
+            line(3000);                             //Drive forward
+            rotate(180);                            //Turn 180 degrees
+            line(3000);                             //Drive back to origin
         }
 
 
@@ -548,9 +662,8 @@ class Battery
 
         int health;
         int cycles;
-        float level;
-        float lastTrip;
-        bool empty;
+        float level = 100.0;
+        bool empty = false;
 
 
     public:
@@ -569,9 +682,11 @@ class Battery
         }
 
 
-        int getBatteryLevel(float trip, float weight=0, float speed=0)
+        int getBatteryLevel(float trip, float weight=0)
         {
-            level = constrain(level - (trip-lastTrip)*(275+weight)/275, 0, 100);  //Rekner ut batterinivå
+            static float lastTrip = 0.0;
+
+            level -= (trip-lastTrip)*(275+weight)/275;  //Rekner ut batterinivå
             lastTrip = trip;                                                      //Lagrer siste trip
 
             if (level <= 10) {                                                    //Viss batterinivået er under 10%
@@ -579,7 +694,7 @@ class Battery
                 ledRed(HIGH);
             }
 
-            return (int)level;                                                    //Returnerer batterinivå
+            return constrain(level, 0, 100);                                      //Returnerer batterinivå
         }
     
 
@@ -604,16 +719,16 @@ Battery battery;                    //Instans for batteri
 
 
 
-
 void setup() {}
 
 
 
 void loop()
 {
+    float distance;
+    int batteryLevel;
+
     int* config = intf.command();
-    int distance = motion.getTrip(); 
-    int batteryLevel = battery.getBatteryLevel(distance);
 
     switch (config[0]) {
         case 0:
@@ -622,14 +737,18 @@ void loop()
             break;
 
         case 1:
-            drive.followLine(batteryLevel);                   //Korrigerer retning basert på posisjon
+            distance = motion.getTrip();                          //Henter distanse(tur) kjørt
+            batteryLevel = battery.getBatteryLevel(distance);       //Henter batterinivå basert på distanse kjørt
+
+            if (config[1] == 0) drive.followLine(batteryLevel);         //Korrigerer retning basert på posisjon
+            else drive.followLinePD(300, batteryLevel);
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
             break;
 
         case 2:
-            //Konfigurer objektfølgar
+            drive.followObject();                                        //Runs follow object mode (add battery consumption here?)
             break;
         
         case 3:
