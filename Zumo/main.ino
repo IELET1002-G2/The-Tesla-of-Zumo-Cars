@@ -273,7 +273,7 @@ class Interface
             if (releasedAorC() || forceConfig) {                                //Prompts selection of modes.
                 config[1] = 0;                                                  //Resets configuration.
                 
-                if (usbPowerPresent()) Serial.begin(9600);                      //Initiates serial monitor.
+                Serial.begin(9600);                                             //Initiates serial monitor.
 
                 if (Serial) {
                     Serial.print(                                               //Prints selection of modes on monitor.
@@ -287,6 +287,8 @@ class Interface
                         "   6: Slalom\n\n"
                         );
                 }
+
+                while (Serial.available()) Serial.read();
 
                 while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(MODES[config[0]], "<A B^ C>");                        //Prints current mode.
