@@ -274,8 +274,8 @@ class Interface
                 config[1] = 0;                                                  //Resets configuration.
                 
                 if (usbPowerPresent()) {
-                    Serial.begin(9600);                                             //Initiates serial monitor.
-                    while(!Serial);
+                    Serial.begin(9600);                                         //Initiates serial monitor.
+                    while(!Serial);                                             //Waits for serial monitor to open.
                 }
 
                 if (Serial) {
@@ -291,7 +291,7 @@ class Interface
                         );
                 }
 
-                while (Serial.available()) {
+                while (Serial.available()) {                                    //Flush incoming buffer.
                     Serial.flush();
                     Serial.parseInt();
                 }
