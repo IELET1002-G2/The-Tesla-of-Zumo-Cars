@@ -273,7 +273,10 @@ class Interface
             if (releasedAorC() || forceConfig) {                                //Prompts selection of modes.
                 config[1] = 0;                                                  //Resets configuration.
                 
-                Serial.begin(9600);                                             //Initiates serial monitor.
+                if (usbPowerPresent()) {
+                    Serial.begin(9600);                                             //Initiates serial monitor.
+                    while(!Serial);
+                }
 
                 if (Serial) {
                     Serial.print(                                               //Prints selection of modes on monitor.
