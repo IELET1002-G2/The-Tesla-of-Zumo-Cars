@@ -86,8 +86,8 @@ class SelfDriving
 
             int adjust = 0.4*error + 2.0*(error-last);                  //Adjustment based on error and deriavative
 
-            int left = constrain(speed - adjust, -350, 350);            //Left motor speed based on adjustment
-            int right = constrain(speed + adjust, -350, 350);           //Right motor speed based on adjustment
+            int left = constrain(speed - adjust, -400, 400);            //Left motor speed based on adjustment
+            int right = constrain(speed + adjust, -400, 400);           //Right motor speed based on adjustment
 
             if (batteryLevel <= 10 && !emergencyPower) {                //If battery level is to low, stop motors
                 left = 0;                          
@@ -111,7 +111,7 @@ class SelfDriving
                 lastTurn = millis();
                 return true;
             }
-            if (millis() - lastTurn < 1500) return true;
+            if (millis() - lastTurn < 300) return true;
             return false;
         }
 
@@ -558,7 +558,6 @@ class Interface
             static unsigned long timer = millis();  //Variable that stores last time the function printed.
 
             if (millis() - timer > 100) {           //Prints less frequently than every 100ms.
-                lcd.clear();
                 lcd.gotoXY(X, Y);                   //Prints to chosen position.
                 lcd.print(value);                   //Prints number without decimals.
                 
@@ -634,9 +633,9 @@ class Motion
 
         float momSpeed;
         float avgSpeed;
-        float trip;
-        float distance;
-        float displacement;
+        float trip = 0.0;
+        float distance = 0.0;
+        float displacement = 0.0;
 
 
         void calculateMotion()
@@ -815,8 +814,8 @@ void loop()
             batteryLevel = battery.getBatteryLevel(distance);           //Henter batterinivå basert på distanse kjørt
 
             if (drive.noLineFound());
-            if (config[1] == 0) drive.followLine(batteryLevel);    //Korrigerer retning basert på posisjon
-            else drive.followLinePD(300, batteryLevel);
+            else if (config[1] == 0) drive.followLine(batteryLevel);    //Korrigerer retning basert på posisjon
+            else drive.followLinePD(250, batteryLevel);
 
             intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
             intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
