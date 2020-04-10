@@ -288,7 +288,15 @@ class Interface
                         );
                 }
 
-                while (Serial.available()) Serial.read();
+                while (Serial.available()) {
+                    Serial.flush();
+                    Serial.read();
+                    Serial.parseInt();
+                }
+
+                Serial.println("xxxxxxxxxxxxxx");
+                Serial.println(getSerial(0));
+                Serial.println("xxxxxxxxxxxxxx");
 
                 while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(MODES[config[0]], "<A B^ C>");                        //Prints current mode.
