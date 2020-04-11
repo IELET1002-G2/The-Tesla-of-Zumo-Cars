@@ -2,15 +2,15 @@
 #include <Wire.h>
 #include <LSM303.h>
 
-Zumo32U4Motors motors;                                                  //Create instances of the different objects of the Zumo
-Zumo32U4Encoders encoders;
-Zumo32U4LineSensors lineSensors;
+L3G gyro;                                                               //Create instances of the different objects of the Zumo
+Zumo32U4LCD lcd;
+Zumo32U4Motors motors;
+Zumo32U4Buzzer buzzer;
 Zumo32U4ButtonA buttonA;
 Zumo32U4ButtonB buttonB;
 Zumo32U4ButtonC buttonC;
-Zumo32U4LCD lcd;
-Zumo32U4Buzzer buzzer;
-L3G gyro;
+Zumo32U4Encoders encoders;
+Zumo32U4LineSensors lineSensors;
 Zumo32U4ProximitySensors proxSensors;
 
 
@@ -32,7 +32,7 @@ class SelfDriving
         bool sensorInitInterlock;                                       //Bool as interlock when switching between followLine and followObject
         int leftSpeed;
         int rightSpeed;
-        long gyroNoise = 0;
+        long gyroNoise;
         const int threshold = 300;                                      //Threshold for line sensors
 
 
@@ -74,53 +74,27 @@ class SelfDriving
 
 
         /**
-         * Method that uses the Zumo's gyro to PLEASE HELP HERE.
-         * STRUGGLING TO PROVIDE ACCURATE DESCRIPTION OF WHAT THIS
-         * METHOD DOES.
+         * A PI-regulated line stabilisation method that uses the 
+         * gyro values as input for the regulator.
+         * 
+         * @param integral previously returned integral
+         * @param speed target motor speed
         */
         long line(long integral, int speed)
         {
             while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for new available
             gyro.read();                                                //Read latest gyro data
 
-            long g = gyro.g.z - gyroNoise;
+            long g = gyro.g.z - gyroNoise;                              //Get noise reduced gyro reading along z-axis
 
-            if (g > 80 || g < -80)
+            if (g > 80 || g < -80)                                      //Ignore readings below threshold value
             {
-                integral += g;
-                int adjust = 0.015 * g + 0.002 * integral;
-                motors.setSpeeds(speed + adjust, speed - adjust);
+                integral += g;                                          //Add reading to integral
+                int adjust = 0.015 * g + 0.002 * integral;              //Caluclate speed asjustment
+                motors.setSpeeds(speed + adjust, speed - adjust);       //Set new motor speeds
             }
             return integral;
         }
-
-
-        /**
-         * A PD-regulated driving configuration method that uses the 
-         * line sensnor values as input for the regulator.
-        */
-        int PD(int input, int last, int speed, int batteryLevel = 100, bool emergencyPower = false)
-        {
-            int error = 2000 - input;                                   //Converts position to error based on desired position
-            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction for battery level
-
-            int adjust = 0.4*error + 2.0*(error-last);                  //Adjustment based on error and deriavative
-
-            int left = constrain(speed - adjust, -400, 400);            //Left motor speed based on adjustment
-            int right = constrain(speed + adjust, -400, 400);           //Right motor speed based on adjustment
-
-            if (batteryLevel <= 10 && !emergencyPower) {                //If battery level is to low, stop motors
-                left = 0;                          
-                right = 0;
-            }
-
-            motors.setSpeeds(left*batteryCorr, right*batteryCorr);      //Set speeds adjusted for battery level
-
-            return error;                                               //Return error for next deriavative
-        }
-
-
-    public:
 
 
         /**
@@ -160,6 +134,9 @@ class SelfDriving
             return false;
 
         }
+
+
+    public:
         
         
         /**
@@ -205,17 +182,18 @@ class SelfDriving
                                                                         //every time followLine method is called
             lineSensors.initFiveSensors();                              //Initiate the five line sensors on front array of Zumo
 
-            Wire.begin();
-            gyro.init();
-            gyro.enableDefault();
+            Wire.begin();                                               //Open I2C comunication
+            gyro.init();                                                //Establish comunication with gyro
+            gyro.enableDefault();                                       //Enable default gyro settings
 
-            delay(500);
-
+            delay(500);                                                 //Delay to ensure zumo is stable for gyro calibration
+            
+            gyroNoise = 0;
             for (int i = 0; i < 100; i++)
             {
-                while(!gyro.readReg(gyro.STATUS_REG));
-                gyro.read();
-                gyroNoise += gyro.g.z; 
+                while(!gyro.readReg(gyro.STATUS_REG));                  //Wait for available gyro data
+                gyro.read();                                            //Read latest gyro data
+                gyroNoise += gyro.g.z;                                  
             }
             gyroNoise /= 100;
 
@@ -280,14 +258,35 @@ class SelfDriving
 
 
         /**
-         * Method that makes the Zumo follow black line on ground
-         * using line sensor values and PD-regulation.
+         * A PD-regulated driving configuration method that uses the 
+         * line sensor values as input for the regulator.
+         *  
+         * @param speed target motor speed
         */
-        void followLinePD(int s, int batteryLevel)
+        void followLinePD(int speed, int batteryLevel = 100, bool emergencyPower = false)
         {
             static int last = 0;
-            int p = lineSensors.readLine(lineSensorValues);             //Reads position from lineSensors
-            last = PD(p, last, s, batteryLevel);                        //Adjusts motors based on position and stores return value
+
+            if (sensorInitInterlock) { 
+                lineSensors.initFiveSensors(); 
+                sensorInitInterlock = false;                                //If followObject() is called after followLine() has been called, initiate front prox. sensor  
+            } 
+        
+            int error = 2000 - lineSensors.readLine(lineSensorValues);      //Converts position to error based on desired position
+            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel);     //Correction for battery level
+
+            int adjust = 0.4*error + 2.0*(error-last);                      //Adjustment based on error and deriavative
+
+            leftSpeed = constrain(speed - adjust, -400, 400);               //Left motor speed based on adjustment
+            rightSpeed = constrain(speed + adjust, -400, 400);              //Right motor speed based on adjustment
+
+            if (batteryLevel <= 10 && !emergencyPower) {                    //If battery level is to low, stop motors
+                leftSpeed = 0;                          
+                rightSpeed = 0;
+            }
+
+            motors.setSpeeds(leftSpeed*batteryCorr, rightSpeed*batteryCorr);//Set speeds adjusted for battery level
+            last = error;                                                   //Store error for next deriavative
         }
 
 
