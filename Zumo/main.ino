@@ -1,45 +1,56 @@
-#include <Zumo32U4.h>
+#include <Zumo32U4.h>                                                   //Include different libraries for use with Zumo
 #include <Wire.h>
 #include <LSM303.h>
 
-Zumo32U4Motors motors;              //Oppretter instans av motorane
-Zumo32U4Encoders encoders;          //Oppretter instans av kodarane
-Zumo32U4LineSensors lineSensors;    //Oppretter instans av linjesensorane
-Zumo32U4ButtonA buttonA;            //Oppretter instans av knapp A
-Zumo32U4ButtonB buttonB;            //Oppretter instans av knapp A
-Zumo32U4ButtonC buttonC;            //Oppretter instans av knapp A
-Zumo32U4LCD lcd;                    //Oppretter instans av LCD-display
-Zumo32U4Buzzer buzzer;              //Oppretter instans av buzzeren
-L3G gyro;                           //Oppretter instans av gyroskop
-Zumo32U4ProximitySensors proxSensors;   //Create instance of the proximity sensors
+Zumo32U4Motors motors;                                                  //Create instances of the different objects of the Zumo
+Zumo32U4Encoders encoders;
+Zumo32U4LineSensors lineSensors;
+Zumo32U4ButtonA buttonA;
+Zumo32U4ButtonB buttonB;
+Zumo32U4ButtonC buttonC;
+Zumo32U4LCD lcd;
+Zumo32U4Buzzer buzzer;
+L3G gyro;
+Zumo32U4ProximitySensors proxSensors;
 
 
 
 
+/**
+ * Class containing methods for different driving configurations of the Zumo32U4.
+ * Some methods include PD-regulated driving configurations, while others do not.
+ * The methods are all coded to serve their own purpose, so depending on its purpose,  
+ * line sensors, motor encoders, the gyro and the front proximity sensors are
+ * applied where applicable. Should only declare object once.
+*/
 class SelfDriving
 {
     private:
 
-        unsigned int lineSensorValues[5];                       //Verdien til kvar linjesensor
+        unsigned int lineSensorValues[5];                               //Declare array to store the five readings from line sensors
 
-        bool sensorInitInterlock;                               //Bool to save interlock value through program
+        bool sensorInitInterlock;                                       //Bool as interlock when switching between followLine and followObject
         int leftSpeed;
         int rightSpeed;
         long gyroNoise = 0;
-        const int threshold = 300;                             //Threshold for line sensors
+        const int threshold = 300;                                      //Threshold for line sensors
 
 
+        /**
+         * Method that uses the motor encoders to rotate the Zumo to
+         * the set number of degrees given in method argument.
+        */
         void rotate(int degrees)
         {
-            float arcCounts = 7.63125*degrees;                  //Calibrated number of counts for given angle
+            float arcCounts = 7.63125*degrees;                          //Calibrated number of counts for given angle
 
-            int leftStart = encoders.getCountsLeft();           //Start counts left
-            int rightStart = encoders.getCountsRight();         //Start counts right
+            int leftStart = encoders.getCountsLeft();                   //Start counts left
+            int rightStart = encoders.getCountsRight();                 //Start counts right
 
             int sum = 0;
 
-            motors.setSpeeds(0, 0);                             //Stop motor before rotation
-            delay(50);                                          //Delay to get rid of momentum
+            motors.setSpeeds(0, 0);                                     //Stop motor before rotation
+            delay(50);                                                  //Delay to get rid of momentum
 
             while (encoders.getCountsRight() - rightStart < arcCounts) 
             {
@@ -62,10 +73,15 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that uses the Zumo's gyro to PLEASE HELP HERE.
+         * STRUGGLING TO PROVIDE ACCURATE DESCRIPTION OF WHAT THIS
+         * METHOD DOES.
+        */
         long line(long integral, int speed)
         {
-            while(!gyro.readReg(gyro.STATUS_REG));                  //Wait for new available
-            gyro.read();                                            //Read latest gyro data
+            while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for new available
+            gyro.read();                                                //Read latest gyro data
 
             long g = gyro.g.z - gyroNoise;
 
@@ -79,10 +95,14 @@ class SelfDriving
         }
 
 
+        /**
+         * A PD-regulated driving configuration method that uses the 
+         * line sensnor values as input for the regulator.
+        */
         int PD(int input, int last, int speed, int batteryLevel = 100, bool emergencyPower = false)
         {
             int error = 2000 - input;                                   //Converts position to error based on desired position
-            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction for battey level
+            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction for battery level
 
             int adjust = 0.4*error + 2.0*(error-last);                  //Adjustment based on error and deriavative
 
@@ -102,6 +122,11 @@ class SelfDriving
 
     public:
 
+
+        /**
+         * Method that uses the line sensor values to return a bool
+         * if a right turn or a left turn is detected.
+        */
         bool turnDetect()
         {
             static unsigned long lastTurn = 0;
@@ -116,12 +141,17 @@ class SelfDriving
         }
 
 
+        /**
+         * A method that uses the line sensor values and a threshold to
+         * return true/false whether the Zumo is above a black line on
+         * the floor or not.
+        */
         bool noLine()
         {
             if (
-                lineSensorValues[0] < threshold &&          //While each value is under threshold, return true
-                lineSensorValues[1] < threshold &&          //If line is found, return false
-                lineSensorValues[2] < threshold &&
+                lineSensorValues[0] < threshold &&                      //While each value is under threshold, return true
+                lineSensorValues[1] < threshold &&
+                lineSensorValues[2] < threshold &&                      //If line is found, return false
                 lineSensorValues[3] < threshold &&
                 lineSensorValues[4] < threshold
             ) {
@@ -132,23 +162,29 @@ class SelfDriving
         }
         
         
-        bool noLineFound()                                  //Car has 2 seconds to find, and find back to, line if no line is detected
+        /**
+         * Method that returns true or false based on whether a black 
+         * line is found or not. It uses other methods such as turnDetect()
+         * and noLine() to drive straight forward, rotate 180 degrees and
+         * drive back.
+        */
+        bool noLineFound()                                              //Car has 2 seconds to find, and find back to, line if no line is detected
         {
-            const unsigned long timeThreshold = 2000;       //Time interval before car should rotate 180 deg and go back
-            static unsigned long timeStart = millis();      //Time since no line was found
+            const unsigned long timeThreshold = 2000;                   //Time interval before car should rotate 180 deg and go back
+            static unsigned long timeStart = millis();                  //Time since no line was found
             static long integral = 0;
 
             
             if (turnDetect() || !noLine()) {
-                timeStart = millis();                       //If line is found, update timeStart so car does not turn around
+                timeStart = millis();                                   //If line is found, update timeStart so car does not turn around
                 integral = 0;
                 return false;
             }
 
-            if (millis() - timeStart > timeThreshold)       //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
+            if (millis() - timeStart > timeThreshold)                   //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
             {
                 rotate(180);
-                timeStart = millis();                       //Update timeStart so car does not turn around again while still no line is found
+                timeStart = millis();                                   //Update timeStart so car does not turn around again while still no line is found
                 integral = 0;
                 motors.setSpeeds(200, 200);
             }
@@ -157,11 +193,17 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that calibrates the line sensors and the gyro.
+         * This method should be called before any other method
+         * that depends on the line sensor/gyro is called. Examples
+         * are followLine() and line().
+        */
         void calibrateSensors() 
         {
-            sensorInitInterlock = false;                    //Linesensors is now configured, no need to do it again 
-                                                            //unless prox. sensors config has been run
-            lineSensors.initFiveSensors();                  //Starter 5-linjesensorkonfigurasjonen
+            sensorInitInterlock = false;                                //Interlock bool to keep Zumo from initiating line sensors 
+                                                                        //every time followLine method is called
+            lineSensors.initFiveSensors();                              //Initiate the five line sensors on front array of Zumo
 
             Wire.begin();
             gyro.init();
@@ -177,96 +219,113 @@ class SelfDriving
             }
             gyroNoise /= 100;
 
-            for (int t = 0; t <= 200; t++) {                //Varer i 4000ms der t er tid i ms
+            for (int t = 0; t <= 200; t++) {                            //For loop that lasts for 4000 ms where t is time in ms
 
-                lineSensors.calibrate();                    //Kalibrerer sensor
+                lineSensors.calibrate();                                //Calibrates line sensors for every iteration of loop
 
-                int speed = 400*sin(PI/100*t);              //Farten er beskrive av sinus-uttrykk med periode 4000ms
+                int speed = 400*sin(PI/100*t);                          //Rotation of car is described by a sine function where T = 4000 ms
                 
-                motors.setSpeeds(speed, -speed);            //Bilen roterer med varierande fart
-                delay(1);                                   //Delay for å styre tida
+                motors.setSpeeds(speed, -speed);                        //Zumo rotates with speed depending on sine function
+                delay(1);                                               //Delay to manage period time
             }
         }
 
 
+        /**
+         * Method that uses the line sensor values and a predefined 
+         * polynomial to regulate motor speeds. Is used to follow 
+         * black line on ground.
+        */
         void followLine(int batteryLevel, bool emergencyPower = false, bool fastMode = false)
         {
             if (sensorInitInterlock) { 
                 lineSensors.initFiveSensors(); 
 
-                sensorInitInterlock = false;                            //If followObject() is called after followLine() has been called, initFrontSensor  
+                sensorInitInterlock = false;                            //If followObject() is called after followLine() has been called, initiate front prox. sensor  
             } 
 
-            int value = lineSensors.readLine(lineSensorValues);         //Leser av posisjonen til zumoen 
-            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Korreksjonsfaktor for batterinivå
+            int value = lineSensors.readLine(lineSensorValues);         //Gets line sensor readings from array and returns an int from 0-4000 
+            float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction factor for battery level
 
-            if (fastMode) {                                             //Rask modus
-                leftSpeed = 4.00E+02 - 8.00E+02*exp(-2.50E-03*value);   //Farten er bestemt av eksponentialfunksjonar
+            if (fastMode) {                                             //Fast mode
+                leftSpeed = 4.00E+02 - 8.00E+02*exp(-2.50E-03*value);   //Speed is set by exponential functions
                 rightSpeed = 4.00E+02 - 3.63E-02*exp(+2.50E-03*value);
             }
             else {
-                leftSpeed =                             //Venstre fart er lik eit 4.gradspolynom der variabelen 
-                    -4.00E+02*pow(value, 0)             //er sensorverdien med Df = [0, 4000].
-                    +1.04E+00*pow(value, 1)             //Polynomet er stigande for dette intervallet med 
-                    -6.63E-04*pow(value, 2)             //verdiar Vf = [-400, 400].
-                    +1.80E-07*pow(value, 3)             //Polynomet har terrassepunkt i (2000, 200).
+                leftSpeed =                                             //Left motor speed is equal to a polynomial to the 4th degree where the variable 
+                    -4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
+                    +1.04E+00*pow(value, 1)                             //The polynomial is icreasing in Df with values 
+                    -6.63E-04*pow(value, 2)                             //Vf = [-400, 400].
+                    +1.80E-07*pow(value, 3)                             //There is a saddle point at (2000, 200).
                     -1.67E-11*pow(value, 4);
 
-                rightSpeed =                            //Høgre fart er lik eit 4.gradspolynom der variabelen er
-                    +4.00E+02*pow(value, 0)             //sensorverdien med Df = [0, 4000].
-                    -1.07E-01*pow(value, 1)             //Polynomet er synkande for dette intervallet med 
-                    -1.03E-04*pow(value, 2)             //verdiar Vf = [-400, 400].
-                    +8.67E-08*pow(value, 3)             //Polynomet har terrassepunkt i (2000, 200).
+                rightSpeed =                                            //Right motor speed is equal to a polynomial to the 4th degree where the variable
+                    +4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
+                    -1.07E-01*pow(value, 1)                             //The polynomial is decreasing in Df with values 
+                    -1.03E-04*pow(value, 2)                             //Vf = [-400, 400].
+                    +8.67E-08*pow(value, 3)                             //There is a saddle point at (2000, 200).
                     -1.67E-11*pow(value, 4);
             }
 
-            leftSpeed *= batteryCorr;                   //Korrigerer med batterinivået
+            leftSpeed *= batteryCorr;                                   //Correct the speed according to the battery level
             rightSpeed *= batteryCorr;
 
-            if (batteryLevel <= 10 && !emergencyPower) {//Viss batterinivået er 10% og nødbatteri ikkje er aktivert
-                leftSpeed = 0;                          //Setter fartane til null
+            if (batteryLevel <= 10 && !emergencyPower) {                //If battery level is 10 % and emergency power is not activated
+                leftSpeed = 0;                                          //Set the two motor speeds to 0
                 rightSpeed = 0;
             }
             
-            motors.setSpeeds(leftSpeed, rightSpeed);    //Setter fart til utrekna, korrigerte verdiar
+            motors.setSpeeds(leftSpeed, rightSpeed);                    //Set corrected motor speeds to motors
         }
 
 
+        /**
+         * Method that makes the Zumo follow black line on ground
+         * using line sensor values and PD-regulation.
+        */
         void followLinePD(int s, int batteryLevel)
         {
             static int last = 0;
-            int p = lineSensors.readLine(lineSensorValues);  //Reads position from lineSensors
-            last = PD(p, last, s, batteryLevel);         //Adjusts motors based on position and stores return value
+            int p = lineSensors.readLine(lineSensorValues);             //Reads position from lineSensors
+            last = PD(p, last, s, batteryLevel);                        //Adjusts motors based on position and stores return value
         }
 
 
-        void followObject()                             //Follow an object within prox. sensor range (~30-40 cm) as it would follow lines on ground
+        /**
+         * This method makes the Zumo follow an object that reflects
+         * IR rays well. It uses the two front IR diodes on the car to
+         * transmit IR rays on a specified pulse to the environment, and 
+         * uses the front proximity sensor to interpret its surroundings.
+         * When an object is within range (~ 30-40 cm), it follows that
+         * object. Otherwise scans if no object within range.
+        */
+        void followObject()
         {
             if (!sensorInitInterlock) { 
-                proxSensors.initFrontSensor();          //Need to call this function in order to use the front prox. sensor
-                                                        //Can only use front when full line sensor array in use, ref. p. 20 in Pololu User Guide
-                sensorInitInterlock = true;             //Init interlock, if followLine() is called after followObject() has been called, initFiveSensors
+                proxSensors.initFrontSensor();                          //Need to call this function in order to use the front prox. sensor
+                                                                        //Can only use front prox. sensor when full line sensor array in use
+                sensorInitInterlock = true;                             //Init interlock, if followLine() is called after followObject() has been called, initFiveSensors
             }                       
 
             int driveSpeed = 150;
             int turnSpeed = 300;
 
-            proxSensors.read();                                          //Function that reads reflected IR from nearby object, takes ~ 3 ms to run
+            proxSensors.read();                                         //Function that reads reflected IR from nearby object, takes ~ 3 ms to run
 
-            int leftReading = proxSensors.countsFrontWithLeftLeds();     //Returns an integer based on reflected IR light
+            int leftReading = proxSensors.countsFrontWithLeftLeds();    //Returns an integer based on reflected IR light
             int rightReading = proxSensors.countsFrontWithRightLeds();
 
-            while (((leftReading + rightReading)) / 2 < 4) {             //As long as no object is detected (object is ~ 140 cm from Zumo), turn until detected
-                proxSensors.read();                                      //Read sensor values for every iteration of the while loop
+            while (((leftReading + rightReading)) / 2 < 4) {            //As long as no object is detected (object is ~ 140 cm from Zumo), turn until detected
+                proxSensors.read();                                     //Read sensor values for every iteration of the while loop
 
                 motors.setSpeeds(turnSpeed, 0);
 
-                leftReading = proxSensors.countsFrontWithLeftLeds();     //Get value from front left prox. sensor
-                rightReading = proxSensors.countsFrontWithRightLeds();   //Get value from front right prox. sensor
+                leftReading = proxSensors.countsFrontWithLeftLeds();    //Get value from front left prox. sensor
+                rightReading = proxSensors.countsFrontWithRightLeds();  //Get value from front right prox. sensor
 
-                if(leftReading >= 4 || rightReading >= 4) {              //If the sensor detected something (within ~ 140 cm range), stop turning and exit while loop
+                if(leftReading >= 4 || rightReading >= 4) {             //If the sensor detected something (within ~ 140 cm range), stop turning and exit while loop
                     motors.setSpeeds(0,0);
-                    delay(30);                                           //Motor safety delay time
+                    delay(30);                                          //Motor safety delay time
                 }
             }
 
@@ -280,6 +339,9 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that makes the Zumo drive in a square pattern.
+        */
         void square()
         {
             for (byte n = 0; n < 4; n++) {
@@ -296,6 +358,9 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that makes the Zumo drive in a circle pattern.
+        */
         void circle()
         {
             motors.setSpeeds(300, 150);
@@ -304,6 +369,11 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that makes the Zumo drive in back and forth in 
+         * a straight line Drives forwards for 2000 ms, rotates
+         * 180 degrees and drives back.
+        */
         void backAndForth()
         {
             for (byte i = 0; i < 2; i++)
@@ -320,13 +390,17 @@ class SelfDriving
         }
 
 
+        /**
+         * Method that makes the Zumo drive slalom between 10 cones
+         * with a predefined spacing between each cone.
+        */
         void slalom()
         {
             motors.setSpeeds(0, 0);
             delay(50);
             
             int counts = encoders.getCountsLeft();
-            float coneCounts = 0.5*7425;            //Kjegledistanse på 0.5m
+            float coneCounts = 0.5*7425;                                //Cone distance of 0.5m
             unsigned long time = millis();
 
             while (encoders.getCountsLeft() - counts < coneCounts) {
@@ -335,7 +409,7 @@ class SelfDriving
 
             time = millis() - time;
             
-            for (byte i = 0; i < 10; i++){          //10 kjegler
+            for (byte i = 0; i < 10; i++){                              //10 cones
                 rotate(90);
                 motors.setSpeeds(200, 200);
                 delay(time);
@@ -355,14 +429,14 @@ class SelfDriving
  * Containing methods for interfacing with Zumo32U4 car including graphical user 
  * inteface with buttons, LCD-display and Serial monitor. Also includes more advanced
  * printing functions than native to the Zumo32U4LCD class. Should only have one 
- * instance and should not be inherited. Class only sorts similar and related functions
+ * object and should not be inherited. Class only sorts similar and related functions
 */
 class Interface
 {
     private:
 
-        bool forceConfig = true;        //Variable that controls whether or not buttons are required to prompt configuration.
-        int config[2] = {0, 0};         //Array stores mode and configuration.
+        bool forceConfig = true;                                        //Variable that controls whether or not buttons are required to prompt configuration.
+        int config[2] = {0, 0};                                         //Array stores mode and configuration.
 
         /**
          * Pauses program if button B is pressed and gives option of going straight 
@@ -370,13 +444,13 @@ class Interface
          * and configuration if button B is pressed. Intended for command()
         */
         void pause() {
-            if (buttonB.getSingleDebouncedRelease()) {              //Pauses if button B is pressed.
+            if (buttonB.getSingleDebouncedRelease()) {                  //Pauses if button B is pressed.
                 motors.setSpeeds(0, 0);
                 print("B:cont", "A/C:conf");
                 
-                while (true) {                                      //Continuously checks if somthing happens.
-                    if (buttonB.getSingleDebouncedRelease()) break; //Continues if button B is pressed again.
-                    if (releasedAorC()) {                           //Any other button prompts configuration.
+                while (true) {                                          //Continuously checks if somthing happens.
+                    if (buttonB.getSingleDebouncedRelease()) break;     //Continues if button B is pressed again.
+                    if (releasedAorC()) {                               //Any other button prompts configuration.
                         enableForceConfig();
                         break;                                                  
                     }
@@ -391,7 +465,7 @@ class Interface
          * @returns true if in right state, else false
         */
         bool releasedAorC() {
-            return                                                  //or not A or C have been pressed.
+            return                                                      //or not A or C have been pressed.
                 buttonA.getSingleDebouncedRelease() ||
                 buttonC.getSingleDebouncedRelease();
         }
@@ -420,9 +494,9 @@ class Interface
         */
         bool getSerial(byte menu) {
             if (Serial.available()) {
-                Serial.flush();                                             //Waits until incoming buffer can be read.
-                config[menu] = Serial.parseInt();                           //Gets mode or configuration from monitor.
-                return true;                                                //Controls flow if configuration received.
+                Serial.flush();                                         //Waits until incoming buffer can be read.
+                config[menu] = Serial.parseInt();                       //Gets mode or configuration from monitor.
+                return true;                                            //Controls flow if configuration received.
             }
             else return false;
         };
@@ -442,7 +516,7 @@ class Interface
          *      with values from 0 to 6, and the configuration of the mode (index 1)
         */
         int* command() {
-            const char* MODES[] = {                                             //Array with names of modes.
+            const char* MODES[] = {                                     //Array with names of modes.
                 "Calib",    //0: Calibrate line sensors
                 "Line",     //1: Follow line
                 "Object",   //2: Follow object
@@ -451,23 +525,23 @@ class Interface
                 "B and F",  //5: Drive forwards, turn 180D, go back
                 "Slalom"    //6: Slalom between cones
                 };
-            const char* LINE_CONFIG[] = {                                       //Array with line follower configurations.
+            const char* LINE_CONFIG[] = {                               //Array with line follower configurations.
                 "Normal",   //0: Polynomial regulated
                 "PD"        //1: PD regulated
                 };
             
-            pause();                                                            //Pauses if button B is pressed.
+            pause();                                                    //Pauses if button B is pressed.
 
-            if (releasedAorC() || forceConfig) {                                //Prompts selection of modes.
-                config[1] = 0;                                                  //Resets configuration.
+            if (releasedAorC() || forceConfig) {                        //Prompts selection of modes.
+                config[1] = 0;                                          //Resets configuration.
                 
                 if (usbPowerPresent()) {
-                    Serial.begin(9600);                                         //Initiates serial monitor.
-                    while(!Serial);                                             //Waits for serial monitor to open.
+                    Serial.begin(9600);                                 //Initiates serial monitor.
+                    while(!Serial);                                     //Waits for serial monitor to open.
                 }
 
                 if (Serial) {
-                    Serial.print(                                               //Prints selection of modes on monitor.
+                    Serial.print(                                       //Prints selection of modes on monitor.
                         "Select mode:\n"
                         "   0: Calibrate linesensors\n"
                         "   1: Line follower\n"
@@ -479,7 +553,7 @@ class Interface
                         );
                 }
 
-                while (Serial.available()) {                                    //Flush incoming buffer.
+                while (Serial.available()) {                            //Flush incoming buffer.
                     Serial.flush();
                     Serial.parseInt();
                 }
@@ -525,7 +599,7 @@ class Interface
                     }
                 }
 
-                if (Serial) {                                                   //Prints confirmation to monitor.
+                if (Serial) {                                           //Prints confirmation to monitor.
                     Serial.print(
                         "\n\nConfiguration done.\n"
                         "Press button B to confirm.\n\n"
@@ -533,19 +607,19 @@ class Interface
                 }
 
                 print("Ready.", "Press B");
-                buttonB.waitForRelease();                                       //Wait for button B to be pushed.
+                buttonB.waitForRelease();                               //Wait for button B to be pushed.
                 lcd.clear();
             }
             
-            forceConfig = false;                    //Turns of forcing.
-            return config;                          //Returns pointer to array that stores configuration.
+            forceConfig = false;                                        //Turns of forcing.
+            return config;                                              //Returns pointer to array that stores configuration.
         }
         
         /**
          * Prompts command() to run without any button being pressed
         */
         void enableForceConfig() {
-            forceConfig = true;           //Forces to configure a single time after call.
+            forceConfig = true;                                         //Forces to configure a single time after call.
         }
 
         /**
@@ -555,14 +629,14 @@ class Interface
          * @param X, Y the coordinates where the integer is printed
         */
         void print(int value, int X, int Y) {
-            static unsigned long timer = millis();  //Variable that stores last time the function printed.
+            static unsigned long timer = millis();                      //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {           //Prints less frequently than every 100ms.
+            if (millis() - timer > 100) {                               //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.gotoXY(X, Y);                   //Prints to chosen position.
-                lcd.print(value);                   //Prints number without decimals.
+                lcd.gotoXY(X, Y);                                       //Prints to chosen position.
+                lcd.print(value);                                       //Prints number without decimals.
                 
-                timer = millis();                   //Saves time.
+                timer = millis();                                       //Saves time.
             }
         }
 
@@ -573,14 +647,14 @@ class Interface
          * @param X, Y the coordinates where the floating-point number is printed
         */
         void print(float value, int X, int Y) {
-            static unsigned long timer = millis();  //Variable that stores last time the function printed.
+            static unsigned long timer = millis();                      //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {           //Prints less frequently than every 100ms.
+            if (millis() - timer > 100) {                               //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.gotoXY(X, Y);                   //Prints to chosen position.
-                lcd.print(value);                   //Prints number with decimals.
+                lcd.gotoXY(X, Y);                                       //Prints to chosen position.
+                lcd.print(value);                                       //Prints number with decimals.
                 
-                timer = millis();                   //Saves time.
+                timer = millis();                                       //Saves time.
             }
         }
 
@@ -591,15 +665,15 @@ class Interface
          * @param string2 a string to be printed to second row on LCD-display
         */
         void print(char* string1, char* string2) {
-            static unsigned long timer = millis();  //Variable that stores last time the function printed.
+            static unsigned long timer = millis();                      //Variable that stores last time the function printed.
 
-            if (millis() - timer > 100) {           //Prints less frequently than every 100ms.
+            if (millis() - timer > 100) {                               //Prints less frequently than every 100ms.
                 lcd.clear();
-                lcd.print(string1);                 //Prints text to first row.
+                lcd.print(string1);                                     //Prints text to first row.
                 lcd.gotoXY(0, 1);
-                lcd.print(string2);                 //Prints text to second row.
+                lcd.print(string2);                                     //Prints text to second row.
                 
-                timer = millis();                   //Saves time.
+                timer = millis();                                       //Saves time.
             }
         }
 
@@ -614,13 +688,13 @@ class Interface
 
             for (byte x = 0; x < constrain(sizeof(message)-1, 0, 16); x++)  //Iterates through string.
             {
-                if (x >= 8) {                       //If string is longer than first row.
-                    lcd.gotoXY(x-8, 1);             //Goes to second row and resets coulumn.
-                    lcd.print(message[x]);          //Prints character.
+                if (x >= 8) {                                           //If string is longer than first row.
+                    lcd.gotoXY(x-8, 1);                                 //Goes to second row and resets coulumn.
+                    lcd.print(message[x]);                              //Prints character.
                 }
                 else {
-                    lcd.gotoXY(x, 0);               //Goes to new coulumn.
-                    lcd.print(message[x]);          //Prints character.
+                    lcd.gotoXY(x, 0);                                   //Goes to new coulumn.
+                    lcd.print(message[x]);                              //Prints character.
                 }
             }
         }     
@@ -628,6 +702,10 @@ class Interface
 
 
 
+/**
+ * Class containing methods for calculation of speed and displacement. These methods
+ * rely on the motor encoders for calculations. Should only declare object once.
+*/
 class Motion
 {
     private:
@@ -639,27 +717,32 @@ class Motion
         float displacement;
 
 
+        /**
+         * Method that calculates trip, distance and displacement.
+        */
         void calculateMotion()
         {
-            static unsigned long timer;                                 //Timer for å lagre tidsintervallet
+            static unsigned long timer;                                 //Timer to save time interval
 
-            int leftCount = encoders.getCountsAndResetLeft();           //Leser av teljarane på venstre kodar
-            int rightCount = encoders.getCountsAndResetRight();         //Leser av teljarane på høgre kodar
+            int leftCount = encoders.getCountsAndResetLeft();           //Reads the left encoder's value
+            int rightCount = encoders.getCountsAndResetRight();         //Reads the right encoder's value
 
-            //Teoretisk count per meter er 909.7(2*pi*r)=7425
+                                                                        //Theoretical count per meter is 909.7(2*pi*r)=7425
+            float avgDisp = (leftCount + rightCount)/(2.0*7765.0);      //Average displacement of the Zumo
+            float avgDist = abs(avgDisp);                               //Average distance is the absolute value of the displacement
 
-            float avgDisp = (leftCount + rightCount)/(2.0*7765.0);      //Gjennomsnittlig forflytning bilen har gått
-            float avgDist = abs(avgDisp);                               //Distansen er absoluttverdien av forflytninga
+            trip += avgDist;                                            //Accumulate trip-counter
+            distance += avgDist;                                        //Accumulate distance
+            displacement += avgDisp;                                    //Accumulate displacement
 
-            trip += avgDist;                                            //Akkumulerer trip-teljar
-            distance += avgDist;                                        //Akkumulerer distanse
-            displacement += avgDisp;                                    //Akkumulerer forflytning
-
-            momSpeed = avgDisp/(millis() - timer)*1000;                 //Momentanfarta
+            momSpeed = avgDisp/(millis() - timer)*1000;                 //Momentary speed
             timer = millis(); 
         }
 
 
+        /**
+         * Method that calculates the Zumo's average speed.
+        */
         float getAverageSpeed()
         {
             static unsigned long timer1 = millis();
@@ -694,37 +777,55 @@ class Motion
 
     public:
 
+        /**
+         * Method that calculates trip, distance and displacement,
+         * and returns momentary speed.
+        */
         float getSpeed()
         {
-            calculateMotion();          //Kalkulerer bevegelsen
-            return momSpeed;               //Henter gjennomsnittsfart
+            calculateMotion();                                          //Calculates the motion
+            return momSpeed;                                            //Returns the momentary speed
         }
 
 
+        /**
+         * Method that calculates trip, distance and displacement,
+         * and returns distance.
+        */
         float getDistance()
         {
-            calculateMotion();          //Kalkulerer bevegelsen
-            return distance;            //Henter distansen
+            calculateMotion();                                          //Calculates the motion
+            return distance;                                            //Returns the distance
         }
 
 
+        /**
+         * Method that calculates trip, distance and displacement,
+         * and returns displacement.
+        */
         float getDisplacement()
         {
-            calculateMotion();          //Kalkulerer bevegelsen
-            return displacement;        //Henter forflytninga
+            calculateMotion();                                          //Calculates the motion
+            return displacement;                                        //Returns the displacement
         } 
         
 
+        /**
+         * Method that calculates trip, distance and displacement,
+         * and returns trip.
+        */
         float getTrip()
         {
-            calculateMotion();          //Kalkulerer bevegelsen
-            return trip;                //Henter trip-teljar
+            calculateMotion();                                          //Calculates the motion
+            return trip;                                                //Returns the trip counter
         }
 
-
+        /**
+         * Method that sets trip value.
+        */
         void setTrip(int value)
         {
-            trip = value;               //Setter trip-verdi
+            trip = value;                                               //Sets trip value
         }
 };
 
@@ -744,13 +845,13 @@ class Battery
 
         void chargeBattery()
         {
-            static bool ledState = HIGH;                        //Variabel som lagrer tilstand til LED
+            static bool ledState = HIGH;                                //Variable that saves LED state
             
             for (byte i = 0; i <= 100; i++) {
                 level = i;
 
                 ledRed(ledState);
-                ledState = !ledState;                           //Toggler tilstand
+                ledState = !ledState;                                   //Toggles the state
                 delay(400);
             }
         }
@@ -760,21 +861,21 @@ class Battery
         {
             static float lastTrip = 0.0;
 
-            level -= (trip-lastTrip)*(275+weight)/275;  //Rekner ut batterinivå
-            lastTrip = trip;                                                      //Lagrer siste trip
+            level -= (trip-lastTrip)*(275+weight)/275;                  //Calculates the battery level
+            lastTrip = trip;                                            //Saves the last trip
 
-            if (level <= 10) {                                                    //Viss batterinivået er under 10%
-                empty = true;                                                     //Inkrementerer teljar
+            if (level <= 10) {                                          //If the battery level is below 10 %
+                empty = true;                                           //Incremens the trip counter
                 ledRed(HIGH);
             }
 
-            return constrain(level, 0, 100);                                      //Returnerer batterinivå
+            return constrain(level, 0, 100);                            //Returns battery level
         }
     
 
         bool getEmergencyPower()
         {
-            return empty;                                       //Får resterande batteri første gong den er under 10%
+            return empty;                                               //Returns remaining battery level first time under 10 %
         }
 
 
@@ -786,10 +887,10 @@ class Battery
 
 
 
-SelfDriving drive;                  //Instans for sjølvkjøring
-Interface intf;                     //Instans for brukargrensesnitt
-Motion motion;                      //Instans for henting av distansedata
-Battery battery;                    //Instans for batteri
+SelfDriving drive;                                                      //Create object of the four classes
+Interface intf;
+Motion motion;
+Battery battery;
 
 
 
@@ -806,44 +907,44 @@ void loop()
 
     switch (config[0]) {
         case 0:
-            drive.calibrateSensors();                                   //Kalibrerer sensorane på kommando
+            drive.calibrateSensors();                                   //Calibrates the sensors on command
             intf.enableForceConfig();
             break;
 
         case 1:
-            distance = motion.getTrip();                                //Henter distanse(tur) kjørt
-            batteryLevel = battery.getBatteryLevel(distance);           //Henter batterinivå basert på distanse kjørt
+            distance = motion.getTrip();                                //Gets distance driven
+            batteryLevel = battery.getBatteryLevel(distance);           //Gets battery level based on distance driven
 
             if (drive.noLineFound());
-            if (config[1] == 0) drive.followLine(batteryLevel);    //Korrigerer retning basert på posisjon
+            if (config[1] == 0) drive.followLine(batteryLevel);         //Corrects direction based on position
             else drive.followLinePD(300, batteryLevel);
 
-            intf.print(distance, 0, 0);                                 //Printer posisjon til første linje på LCD
-            intf.print(batteryLevel, 0, 1);                             //Printer batterinivå til andre linje på LCD
+            intf.print(distance, 0, 0);                                 //Prints position to first line on LCD
+            intf.print(batteryLevel, 0, 1);                             //Prints battery level to second line on LCD
             break;
 
         case 2:
-            drive.followObject();                                        //Runs follow object mode (add battery consumption here?)
+            drive.followObject();                                       //Calls follow object mode
             break;
         
         case 3:
-            drive.square();
-            intf.enableForceConfig();
+            drive.square();                                             //Calls square method
+            intf.enableForceConfig();                                   //Triggers interface menu
             break;
 
         case 4:
-            drive.circle();
-            intf.enableForceConfig();
+            drive.circle();                                             //Calls circle method
+            intf.enableForceConfig();                                   //Triggers interface menu
             break;
 
         case 5:
-            drive.backAndForth();
-            intf.enableForceConfig();
+            drive.backAndForth();                                       //Calls backAndForth method
+            intf.enableForceConfig();                                   //Triggers interface menu
             break;
 
         case 6:
-            drive.slalom();
-            intf.enableForceConfig();
+            drive.slalom();                                             //Calls slalom method
+            intf.enableForceConfig();                                   //Triggers interface menu
             break;
 
         default:
