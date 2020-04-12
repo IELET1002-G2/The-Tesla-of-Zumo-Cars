@@ -37,39 +37,32 @@ class SelfDriving
 
 
         /**
-         * Method that uses the motor encoders to rotate the Zumo to
+         * Method that uses the gyro to rotate the Zumo to
          * the set number of degrees given in method argument.
         */
         void rotate(int degrees)
         {
-            float arcCounts = 7.63125*degrees;                          //Calibrated number of counts for given angle
+            if (degrees < 0) motors.setSpeeds(200, -180);                   //Determine what direction to rotate
+            else motors.setSpeeds(-200, 180);                               //Different motor speeds due to asymetric motor power
+            degrees = abs(degrees);
 
-            int leftStart = encoders.getCountsLeft();                   //Start counts left
-            int rightStart = encoders.getCountsRight();                 //Start counts right
+            double deg = 0.0;
+            unsigned long lt = micros();
 
-            int sum = 0;
-
-            motors.setSpeeds(0, 0);                                     //Stop motor before rotation
-            delay(50);                                                  //Delay to get rid of momentum
-
-            while (encoders.getCountsRight() - rightStart < arcCounts) 
+            while (abs(deg) < degrees)
             {
-                int left = encoders.getCountsLeft() - leftStart;        //Left counts since start
-                int right = encoders.getCountsRight() - rightStart;     //Right counts since start
-                int err = left + right;                                 //Error based on difference in counts
+                while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for available gyro data
+                gyro.read();                                                //Read gyro data
 
-                sum += err;                                             //Integral of error
+                unsigned long t = micros();
+                unsigned long dt = t - lt;                                  //Time difference since last read
                 
-                int adjust = 0.1*err + 0.001*sum;                       //Calculates weighted adjustment
+                deg += (double)(gyro.g.z - gyroNoise) * dt / 14050000.0;    //Calculated degrees rotated this itteration, divided by calibrated factor
 
-                left = constrain(-200 + adjust, -400, 400);             //New left speed
-                right = constrain(200 - adjust, -400, 400);             //New right speed
-                
-                motors.setSpeeds(left, right);                          //Set motor speeds
+                lt = t;
             }
-
-            motors.setSpeeds(0, 0);                                     //Stop motors after rotation
-            delay(50);                                                  //Delay to get rid of momentum
+            motors.setSpeeds(0,0);                                          //Stop motors at end of rotation
+            delay(50);                                                      //Delay to get rid of momentum
         }
 
 
@@ -184,7 +177,10 @@ class SelfDriving
 
             Wire.begin();                                               //Open I2C comunication
             gyro.init();                                                //Establish comunication with gyro
-            gyro.enableDefault();                                       //Enable default gyro settings
+
+            gyro.writeReg(gyro.CTRL1, 0b11111111);                      //800 Hz output data rate, low-pass filter cutoff 100 Hz
+            gyro.writeReg(gyro.CTRL4, 0b00100000);                      //2000 dps full scale
+            gyro.writeReg(gyro.CTRL5, 0b00000000);                      //High-pass filter disabled
 
             delay(500);                                                 //Delay to ensure zumo is stable for gyro calibration
             
