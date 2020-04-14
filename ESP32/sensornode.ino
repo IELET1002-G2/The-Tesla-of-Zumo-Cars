@@ -1,14 +1,30 @@
-/* Comment this out to disable prints and save space */
+/**
+ * V0   Set data points in average calculations
+ * V1   TMP36: Momentary temperature reading
+ * V2   TMP36: Average temperature reading
+ * V3   HCSR04: Momentary distance reading
+ * V4   HCSR04: Average distance reading
+ * V5   VL6180X: Momentary distance reading
+ * V6   VL6180X: Average distance reading
+ * V7   VL6180X: Momentary lux reading
+ * V8   VL6180X: Average lux reading
+ * V9   Terminal
+ * V10  Servo
+*/
+
 #define BLYNK_PRINT Serial
 
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <BlynkSimpleEsp32.h>
-//Include sensor- and servo-libraries here
+#include <ESP32Servo.h>
+#include <Adafruit_VL6180X.h>
 
 BlynkTimer timer;
 WebServer server;   //Port is 80 as default
+Adafruit_VL6180X vl6180x;
+Servo servo;
 
 const char* AUTH = "";
 const char* SSID = "";
@@ -38,7 +54,7 @@ const char* HTML =
       </tr>\
       <tr>\
         <td>VL6180X</td>\
-        <td> %d lux</td>\
+        <td> %0.1f lux</td>\
       </tr>\
     </table>\
     </body>\
@@ -83,9 +99,7 @@ class Sensor {
          * 
         */
         int read() {
-            int sensorReading = analogRead(inputPin);
-            calculateAverage(sensorReading);
-            return sensorReading;
+            return analogRead(inputPin);
         }
         
         /**
@@ -111,7 +125,9 @@ class Sensor {
         }
 };
 
-
+/**
+ * 
+*/
 class HCSR04UltrasonicSensor : public Sensor {
     private:
         uint8_t trigger;
@@ -145,11 +161,11 @@ class HCSR04UltrasonicSensor : public Sensor {
             calculateAverage(distance);
             return distance;
         }
-
-        //More functions related to this class
 };
 
-
+/**
+ * 
+*/
 class TMP36TemperatureSensor : public Sensor {
     public:
         /**
@@ -159,33 +175,75 @@ class TMP36TemperatureSensor : public Sensor {
             setInputPin(pinNumber);
         }
 
-        //More functions related to this class
+        float getTemperature() {
+            float temperature = read();
+            //Magic happens, temp processed...
+            calculateAverage(temperature);
+            return temperature;
+        }
 };
 
-
-class VL6180XTimeOfFlight : public Sensor {
-    private:
-
+/**
+ * 
+*/
+class VL6180XRangeSensor : public Sensor {
     public:
-        int getDistance() {}
-        int getLux() {}
+        uint8_t getDistance() {
+            uint8_t distance = vl6180x.readRange();
 
-        //More functions related to this class
+            calculateAverage(distance);
+            return distance;
+        }
+};
+
+/**
+ * 
+*/
+class VL6180XLuxSensor : public Sensor {
+    public:
+        float getLux() {
+            float lux = vl6180x.readLux(VL6180X_ALS_GAIN_5);
+
+            calculateAverage(lux);
+            return lux;
+        }
 };
 
 
 HCSR04UltrasonicSensor dist(32, 33);
 TMP36TemperatureSensor temp(34);
-VL6180XTimeOfFlight tof;
+VL6180XRangeSensor vlDist;
+VL6180XLuxSensor vlLux;
+WidgetTerminal terminal(V9);
 
 /**
  * Slider for how many values for each point
 */
-BLYNK_WRITE(V5) {
+BLYNK_WRITE(V0) {
     uint8_t dataPoints = param.asInt(); // assigning incoming value from V1 to a variable 
 
     temp.setDataPoints(dataPoints); 
     dist.setDataPoints(dataPoints);
+    vlDist.setDataPoints(dataPoints); 
+    vlLux.setDataPoints(dataPoints);
+}
+
+/**
+ * 
+*/
+BLYNK_WRITE(V9) {
+    terminal.println(temp.getTemperature());
+    terminal.println(dist.getDistance());
+    terminal.println(vlDist.getDistance());
+    terminal.println(vlLux.getLux());
+    terminal.flush();
+}
+
+/**
+ * 
+*/
+BLYNK_WRITE(V10) {
+    servo.write(param.asInt()); //writes value from blynk slider to servo
 }
 
 /**
@@ -196,10 +254,14 @@ BLYNK_WRITE(V5) {
  * Please don't send more that 10 values per second.
 */
 void timerEvent() {
-    Blynk.virtualWrite(V1, temp.read());
-    Blynk.virtualWrite(V2, dist.getDistance());
-    Blynk.virtualWrite(V3, temp.getAverage());
+    Blynk.virtualWrite(V1, temp.getTemperature());
+    Blynk.virtualWrite(V2, temp.getAverage());
+    Blynk.virtualWrite(V3, dist.getDistance());
     Blynk.virtualWrite(V4, dist.getAverage());
+    Blynk.virtualWrite(V5, vlDist.getDistance());
+    Blynk.virtualWrite(V6, vlDist.getAverage());
+    Blynk.virtualWrite(V7, vlLux.getLux());
+    Blynk.virtualWrite(V8, vlLux.getAverage());
 }
 
 /**
@@ -209,13 +271,6 @@ void serverUpdate() {
     handleRoot();
 }
 
-/**
- * 
-*/
-char* floatToString(float number, uint8_t precision = 0) {
-    static char buffer[10];
-    return dtostrf(number, 0, precision, buffer);
-}
 
 /**
  * 
@@ -226,8 +281,8 @@ void handleRoot() {
     snprintf(buffer, 500, HTML, 
              dist.getAverage(), 
              temp.getAverage(),
-             tof.getDistance(),
-             tof.getLux());
+             vlDist.getAverage(),
+             vlLux.getAverage());
 
     server.send(200, "text/html", buffer);                            //Code 200, display HTML code.
 }
@@ -248,6 +303,12 @@ void setup() {
 
     dist.resetSensorReadings();                                     // initialize all the readings to 0:
     temp.resetSensorReadings();
+    vlDist.resetSensorReadings();
+    vlLux.resetSensorReadings();
+
+    terminal.clear(); 
+    terminal.println(F("blynk program running"));
+    terminal.flush();
 }
 
 /**
@@ -258,29 +319,3 @@ void loop() {
     timer.run();                                                    // Initiates BlynkTimer
     server.handleClient();                                          //Checking web server to manage occurring events
 }
-
-/* Other functions:
-
-
-void timerEvent2() {
-    // You can send any value at any time.
-    // Please don't send more that 10 values per second.
-    Blynk.virtualWrite(V5, millis() / 60000);
-}
-
-
-// This function will be called every time widget
-// in Blynk app writes values to the Virtual Pin V1
-BLYNK_WRITE(V1) {
-    int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
-    // process received value
-}
-
-
-// This function is called when there is a widget
-// which is requesting data from Virtual Pin V5
-BLYNK_READ(V5) {
-    // This command writes Arduino's uptime in seconds to Virtual Pin (5)
-    Blynk.virtualWrite(V5, millis() / 1000);
-}
-*/
