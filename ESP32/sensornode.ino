@@ -10,9 +10,9 @@
 BlynkTimer timer;
 WebServer server;   //Port is 80 as default
 
-const char* AUTH = "dLeXTr8VukfPiG6OrwApA3GPqJPdJXb9";
-const char* SSID = "Telenor1350bue";
-const char* PASS = "hjakmeozaouet";
+const char* AUTH = "";
+const char* SSID = "";
+const char* PASS = "";
 const char* HTML = 
     "<!DOCTYPE html>\
     <html>\
