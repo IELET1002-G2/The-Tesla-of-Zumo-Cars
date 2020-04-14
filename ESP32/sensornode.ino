@@ -133,9 +133,9 @@ class HCSR04UltrasonicSensor : public Sensor {
         */
         int getDistance() {
             digitalWrite(trigger, LOW);
-            delayMicroseconds(2);
+            delayMicroseconds(5);
             digitalWrite(trigger, HIGH);
-            delayMicroseconds(3);
+            delayMicroseconds(10);
             digitalWrite(trigger, LOW);
 
             int duration = pulseIn(echo, HIGH);
