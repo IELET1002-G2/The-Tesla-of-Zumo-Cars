@@ -195,9 +195,8 @@ BLYNK_WRITE(V5) {
  * Please don't send more that 10 values per second.
 */
 void timerEvent() {
-    temp.read();
-    dist.getDistance();
-    
+    Blynk.virtualWrite(V1, temp.read());
+    Blynk.virtualWrite(V2, dist.getDistance());
     Blynk.virtualWrite(V3, temp.getAverage());
     Blynk.virtualWrite(V4, dist.getAverage());
 }
