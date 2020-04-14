@@ -30,11 +30,11 @@ const char* HTML =
       </tr>\
       <tr>\
         <td>TMP36T</td>\
-        <td> %d C</td>\
+        <td> %0.1f C&deg</td>\
       </tr>\
       <tr>\
         <td>VL6180X</td>\
-        <td> %d cm</td>\
+        <td> %d mm</td>\
       </tr>\
       <tr>\
         <td>VL6180X</td>\
