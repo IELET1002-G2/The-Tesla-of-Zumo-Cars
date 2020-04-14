@@ -152,6 +152,7 @@ class HCSR04UltrasonicSensor : public Sensor<int> {
         int getDistance() {
             digitalWrite(trigger, LOW);
             delayMicroseconds(5);
+
             digitalWrite(trigger, HIGH);
             delayMicroseconds(10);
             digitalWrite(trigger, LOW);
@@ -263,6 +264,20 @@ void timerEvent() {
     Blynk.virtualWrite(V6, vlDist.getAverage());
     Blynk.virtualWrite(V7, vlLux.getLux());
     Blynk.virtualWrite(V8, vlLux.getAverage());
+}
+
+/**
+ * 
+*/
+BLYNK_APP_CONNECTED() {
+    Blynk.virtualWrite(V0, 10); // Resets slider to 10 when app starts
+}
+
+/**
+ * 
+*/
+BLYNK_APP_DISCONNECTED() {
+    //Do something if app stops
 }
 
 /**
