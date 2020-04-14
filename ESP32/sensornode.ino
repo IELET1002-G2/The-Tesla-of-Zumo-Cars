@@ -106,6 +106,7 @@ class Sensor {
          * 
         */
         void setDataPoints(uint8_t value) {
+            resetSensorReadings();
             dataPoints = value;
         }
 };
