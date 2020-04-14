@@ -63,14 +63,15 @@ const char* HTML =
 /**
  * 
 */
+template<typename T>
 class Sensor {
     private:
         uint8_t inputPin;
         uint8_t dataPoints = 10;
         uint8_t sensorReadingsIndex = 0;                                    // the index of the current reading
-        int sensorReadingsAverage = 0;                                      // the average
-        int sensorReadingsTotal = 0;
-        int sensorReadings[50];                                             // the readings from the analog input
+        T sensorReadingsAverage = 0;                                      // the average
+        T sensorReadingsTotal = 0;
+        T sensorReadings[50];                                             // the readings from the analog input
 
     protected:
         /**
@@ -84,7 +85,7 @@ class Sensor {
         /**
          * 
         */
-        void calculateAverage(int newReading) {
+        void calculateAverage(T newReading) {
             sensorReadingsTotal -= sensorReadings[sensorReadingsIndex];     // subtract the last reading
             sensorReadings[sensorReadingsIndex] = newReading;               // read from the sensor
             sensorReadingsTotal += newReading;                              // add the reading to the total
@@ -128,7 +129,7 @@ class Sensor {
 /**
  * 
 */
-class HCSR04UltrasonicSensor : public Sensor {
+class HCSR04UltrasonicSensor : public Sensor<int> {
     private:
         uint8_t trigger;
         uint8_t echo;
@@ -166,7 +167,7 @@ class HCSR04UltrasonicSensor : public Sensor {
 /**
  * 
 */
-class TMP36TemperatureSensor : public Sensor {
+class TMP36TemperatureSensor : public Sensor<float> {
     public:
         /**
          * Class constructor
@@ -186,7 +187,7 @@ class TMP36TemperatureSensor : public Sensor {
 /**
  * 
 */
-class VL6180XRangeSensor : public Sensor {
+class VL6180XRangeSensor : public Sensor<int> {
     public:
         uint8_t getDistance() {
             uint8_t distance = vl6180x.readRange();
@@ -199,7 +200,7 @@ class VL6180XRangeSensor : public Sensor {
 /**
  * 
 */
-class VL6180XLuxSensor : public Sensor {
+class VL6180XLuxSensor : public Sensor<float> {
     public:
         float getLux() {
             float lux = vl6180x.readLux(VL6180X_ALS_GAIN_5);
