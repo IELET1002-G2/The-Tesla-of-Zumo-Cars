@@ -255,9 +255,9 @@ void timerEvent() {
     Blynk.virtualWrite(V2, temp.getAverage());
     Blynk.virtualWrite(V3, dist.getDistance());
     Blynk.virtualWrite(V4, dist.getAverage());
-    Blynk.virtualWrite(V5, vlDist.getDistance());     //Temporary: Causes unexpected delay that disrupts WiFi-connection. ESP32 throws exception.
+    Blynk.virtualWrite(V5, vlDist.getDistance());
     Blynk.virtualWrite(V6, vlDist.getAverage());
-    Blynk.virtualWrite(V7, vlLux.getLux());           //Same issue
+    Blynk.virtualWrite(V7, vlLux.getLux());
     Blynk.virtualWrite(V8, vlLux.getAverage());
 }
 
