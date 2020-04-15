@@ -63,12 +63,12 @@ const char* HTML =
 /**
  * 
 */
-template<typename T>
+template<typename T>                                                      //Class Template to make sensor class accept several data types
 class Sensor {
     private:
         uint8_t inputPin;
         uint8_t dataPoints = 10;
-        uint8_t sensorReadingsIndex = 0;                                    // the index of the current reading
+        uint8_t sensorReadingsIndex = 0;                                  // the index of the current reading
         T sensorReadingsAverage = 0;                                      // the average
         T sensorReadingsTotal = 0;
         T sensorReadings[50];                                             // the readings from the analog input
@@ -85,7 +85,7 @@ class Sensor {
         /**
          * 
         */
-        void calculateAverage(T newReading) {
+        void calculateAverage(T newReading) {                               //Method that takes placeholder T for the data type used as argument
             sensorReadingsTotal -= sensorReadings[sensorReadingsIndex];     // subtract the last reading
             sensorReadings[sensorReadingsIndex] = newReading;               // read from the sensor
             sensorReadingsTotal += newReading;                              // add the reading to the total
