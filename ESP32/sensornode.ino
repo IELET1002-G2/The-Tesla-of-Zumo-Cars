@@ -23,7 +23,7 @@
 
 BlynkTimer timer;
 WebServer server;   //Port is 80 as default
-Adafruit_VL6180X vl6180x;
+Adafruit_VL6180X vl;
 Servo servo;
 
 const char* AUTH = "";
@@ -46,7 +46,7 @@ const char* HTML =
       </tr>\
       <tr>\
         <td>TMP36T</td>\
-        <td> %0.1f C&deg</td>\
+        <td> %0.1f C</td>\
       </tr>\
       <tr>\
         <td>VL6180X</td>\
@@ -183,7 +183,8 @@ class VL6180XRangeSensor : public SensorData<int> {
          * 
         */
         uint8_t getDistance() {
-            uint8_t distance = vl6180x.readRange();
+            uint8_t distance;
+            if (vl.begin()) distance = vl.readRange();
 
             calculateAverage(distance);
             return distance;
@@ -199,7 +200,8 @@ class VL6180XLuxSensor : public SensorData<float> {
          * 
         */
         float getLux() {
-            float lux = vl6180x.readLux(VL6180X_ALS_GAIN_5);
+            float lux;
+            if (vl.begin()) lux = vl.readLux(VL6180X_ALS_GAIN_5);
 
             calculateAverage(lux);
             return lux;
@@ -271,17 +273,9 @@ BLYNK_APP_CONNECTED() {
 /**
  * 
 */
-BLYNK_APP_DISCONNECTED() {
-    //Do something if app stops
-}
-
-/**
- * 
-*/
 void serverUpdate() {
     handleRoot();
 }
-
 
 /**
  * 
@@ -302,7 +296,6 @@ void handleRoot() {
  * 
 */
 void setup() {
-    vl6180x.begin();                                                //Initiates VL6180X
     Serial.begin(115200);                                           // Debug console
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
     server.begin();                                                 //Initiates web server.
