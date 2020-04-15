@@ -64,7 +64,7 @@ const char* HTML =
  * 
 */
 template<typename T>                                                      //Class Template to make sensor class accept several data types
-class Sensor {
+class SensorData {
     private:
         uint8_t inputPin;
         uint8_t dataPoints = 10;
@@ -77,14 +77,6 @@ class Sensor {
         /**
          * 
         */
-        void setInputPin(uint8_t pinNumber) {
-            inputPin = pinNumber;
-            pinMode(pinNumber, INPUT);
-        }
-
-        /**
-         * 
-        */
         void calculateAverage(T newReading) {                               //Method that takes placeholder T for the data type used as argument
             sensorReadingsTotal -= sensorReadings[sensorReadingsIndex];     // subtract the last reading
             sensorReadings[sensorReadingsIndex] = newReading;               // read from the sensor
@@ -93,16 +85,9 @@ class Sensor {
 
             sensorReadingsIndex++;                                          // advance to the next position in the array:
             if (sensorReadingsIndex >= dataPoints) sensorReadingsIndex = 0; // if we're at the end of the array wrap around to the beginning
-        }        
+        }
 
     public:
-        /**
-         * 
-        */
-        int read() {
-            return analogRead(inputPin);
-        }
-        
         /**
          * 
         */
@@ -121,7 +106,7 @@ class Sensor {
          * 
         */
         void setDataPoints(uint8_t value) {
-            resetSensorReadings();
+            for (uint8_t i = value; i < 50; i++) sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
             dataPoints = value;
         }
 };
@@ -129,7 +114,7 @@ class Sensor {
 /**
  * 
 */
-class HCSR04UltrasonicSensor : public Sensor<int> {
+class HCSR04UltrasonicSensor : public SensorData<int> {
     private:
         uint8_t trigger;
         uint8_t echo;
@@ -150,9 +135,6 @@ class HCSR04UltrasonicSensor : public Sensor<int> {
          * 
         */
         int getDistance() {
-            digitalWrite(trigger, LOW);
-            delayMicroseconds(5);
-
             digitalWrite(trigger, HIGH);
             delayMicroseconds(10);
             digitalWrite(trigger, LOW);
@@ -168,17 +150,24 @@ class HCSR04UltrasonicSensor : public Sensor<int> {
 /**
  * 
 */
-class TMP36TemperatureSensor : public Sensor<float> {
+class TMP36TemperatureSensor : public SensorData<float> {
+    private:
+        uint8_t inputPin;
+
     public:
         /**
          * Class constructor
         */
         TMP36TemperatureSensor(uint8_t pinNumber) {
-            setInputPin(pinNumber);
+            pinMode(pinNumber, INPUT);
+            inputPin = pinNumber;  
         }
 
+        /**
+         * 
+        */
         float getTemperature() {
-            float temperature = read();
+            float temperature = analogRead(inputPin);
             //Magic happens, temp processed...
             calculateAverage(temperature);
             return temperature;
@@ -186,10 +175,13 @@ class TMP36TemperatureSensor : public Sensor<float> {
 };
 
 /**
- * 
+ * Currently supports only one instance
 */
-class VL6180XRangeSensor : public Sensor<int> {
+class VL6180XRangeSensor : public SensorData<int> {
     public:
+        /**
+         * 
+        */
         uint8_t getDistance() {
             uint8_t distance = vl6180x.readRange();
 
@@ -199,10 +191,13 @@ class VL6180XRangeSensor : public Sensor<int> {
 };
 
 /**
- * 
+ * Currently supports only one instance
 */
-class VL6180XLuxSensor : public Sensor<float> {
+class VL6180XLuxSensor : public SensorData<float> {
     public:
+        /**
+         * 
+        */
         float getLux() {
             float lux = vl6180x.readLux(VL6180X_ALS_GAIN_5);
 
@@ -260,9 +255,9 @@ void timerEvent() {
     Blynk.virtualWrite(V2, temp.getAverage());
     Blynk.virtualWrite(V3, dist.getDistance());
     Blynk.virtualWrite(V4, dist.getAverage());
-    Blynk.virtualWrite(V5, vlDist.getDistance());
+    Blynk.virtualWrite(V5, vlDist.getDistance());     //Temporary: Causes unexpected delay that disrupts WiFi-connection. ESP32 throws exception.
     Blynk.virtualWrite(V6, vlDist.getAverage());
-    Blynk.virtualWrite(V7, vlLux.getLux());
+    Blynk.virtualWrite(V7, vlLux.getLux());           //Same issue
     Blynk.virtualWrite(V8, vlLux.getAverage());
 }
 
@@ -307,8 +302,8 @@ void handleRoot() {
  * 
 */
 void setup() {
+    vl6180x.begin();                                                //Initiates VL6180X
     Serial.begin(115200);                                           // Debug console
-
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
     server.begin();                                                 //Initiates web server.
     server.on("/", handleRoot);                                     //Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
