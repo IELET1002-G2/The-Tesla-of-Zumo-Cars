@@ -175,16 +175,25 @@ class TMP36TemperatureSensor : public SensorData<float> {
 };
 
 /**
- * Currently supports only one instance
+ * 
 */
 class VL6180XRangeSensor : public SensorData<int> {
+    private:
+        Adafruit_VL6180X* vlPointer;
+
     public:
+        /**
+         * Class constructor
+        */
+        VL6180XRangeSensor(Adafruit_VL6180X* instancePointer) {
+            vlPointer = instancePointer;
+        }
         /**
          * 
         */
         uint8_t getDistance() {
             uint8_t distance;
-            if (vl.begin()) distance = vl.readRange();
+            if (vlPointer->begin()) distance = vlPointer->readRange();  //Accessing members of instance without manually deferencing pointer
 
             calculateAverage(distance);
             return distance;
@@ -192,16 +201,26 @@ class VL6180XRangeSensor : public SensorData<int> {
 };
 
 /**
- * Currently supports only one instance
+ * 
 */
 class VL6180XLuxSensor : public SensorData<float> {
+    private:
+        Adafruit_VL6180X* vlPointer;
+
     public:
+        /**
+         * Class constructor
+        */
+        VL6180XLuxSensor(Adafruit_VL6180X* instancePointer) {
+            vlPointer = instancePointer;
+        }
+
         /**
          * 
         */
         float getLux() {
             float lux;
-            if (vl.begin()) lux = vl.readLux(VL6180X_ALS_GAIN_5);
+            if (vlPointer->begin()) lux = vlPointer->readLux(VL6180X_ALS_GAIN_5);
 
             calculateAverage(lux);
             return lux;
@@ -211,8 +230,8 @@ class VL6180XLuxSensor : public SensorData<float> {
 
 HCSR04UltrasonicSensor dist(32, 33);
 TMP36TemperatureSensor temp(34);
-VL6180XRangeSensor vlDist;
-VL6180XLuxSensor vlLux;
+VL6180XRangeSensor vlDist(&vl);
+VL6180XLuxSensor vlLux(&vl);
 WidgetTerminal terminal(V9);
 
 /**
