@@ -26,6 +26,8 @@ WebServer server;   //Port is 80 as default
 Adafruit_VL6180X vl;
 Servo servo;
 
+int vbuttonState;       //Temporary. Only for testing.
+
 const char* AUTH = "";
 const char* SSID = "";
 const char* PASS = "";
@@ -109,6 +111,63 @@ class SensorData {
             for (uint8_t i = value; i < 50; i++) sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
             dataPoints = value;
         }
+};
+
+/**
+ * 
+ */
+class alarmSystem : public SensorData<int> {                                //Because use values to determine alarm or not
+    private:
+        int alarmLED1;                                                      //Two red alarm LEDs should blink alternately, while alarm sound from buzzer
+        int alarmLED2;
+        int alarmBuzzer;
+        bool toggleAlarmState;
+
+    public:
+        /**
+         * 
+         */
+        alarmSystem(int Led1Pin, int Led2Pin, int buzzerPin) {
+            pinMode(Led1Pin, OUTPUT);
+            pinMode(Led2Pin, OUTPUT);
+            pinMode(buzzerPin, OUTPUT);
+
+            alarmLED1 = Led1Pin;
+            alarmLED2 = Led2Pin;
+            alarmBuzzer = buzzerPin;
+        }
+
+    /**
+     * 
+     */
+    void alarm() {
+
+        if (toggleAlarmState) {
+            digitalWrite(alarmLED1, HIGH);
+            digitalWrite(alarmLED2, LOW);
+            //BUZZER HIGH PITCH                         tone-function does not work on ESP
+            toggleAlarmState = !toggleAlarmState;
+        }
+
+        else if (!toggleAlarmState) {
+            digitalWrite(alarmLED1, LOW);
+            digitalWrite(alarmLED2, HIGH);
+            //BUZZER LOW PITCH
+            toggleAlarmState = !toggleAlarmState;
+        }
+
+
+    }
+
+    /**
+     * 
+     */
+    void resetAlarm() {
+        digitalWrite(alarmLED1, LOW);
+        digitalWrite(alarmLED2, LOW);
+        //BUZZER OFF
+    }
+
 };
 
 /**
@@ -233,6 +292,8 @@ TMP36TemperatureSensor temp(34);
 VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
 WidgetTerminal terminal(V9);
+alarmSystem alarmSystem(18, 19, 16);
+WidgetLED BlynkAlarmLED(V12);
 
 /**
  * Slider for how many values for each point
@@ -264,6 +325,12 @@ BLYNK_WRITE(V10) {
     servo.write(param.asInt()); //writes value from blynk slider to servo
 }
 
+//FOR TESTING PURPOSES ONLY
+BLYNK_WRITE(V11) {
+    vbuttonState = param.asInt();
+}
+
+
 /**
  * This function sends Arduino's up time every second to Virtual Pin (5).
  * In the app, Widget's reading frequency should be set to PUSH. This means
@@ -280,6 +347,21 @@ void timerEvent() {
     Blynk.virtualWrite(V6, vlDist.getAverage());
     Blynk.virtualWrite(V7, vlLux.getLux());
     Blynk.virtualWrite(V8, vlLux.getAverage());
+}
+
+/**
+ * 
+ */
+void timerEventToggleAlarm() {
+
+    if(vbuttonState) {     //Insert some kind of trigger
+        alarmSystem.alarm();
+        BlynkAlarmLED.on();
+    }
+
+    if(!vbuttonState) {
+        alarmSystem.resetAlarm(); //Insert some kind of state to reset after back to normal values
+        BlynkAlarmLED.off();
 }
 
 /**
@@ -321,6 +403,7 @@ void setup() {
     server.on("/", handleRoot);                                     //Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
     Serial.println("HTTP server started");
 
+    timer.setInterval(100L, timerEventToggleAlarm);                 //Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
     timer.setInterval(60000L, serverUpdate);
 
