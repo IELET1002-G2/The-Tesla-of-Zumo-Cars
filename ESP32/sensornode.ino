@@ -46,7 +46,7 @@ const char* HTML =
       </tr>\
       <tr>\
         <td>TMP36T</td>\
-        <td> %0.1f C%s</td>\
+        <td> %0.1f C</td>\
       </tr>\
       <tr>\
         <td>VL6180X</td>\
@@ -304,7 +304,7 @@ void handleRoot() {
 
     snprintf(buffer, 500, HTML, 
              dist.getAverage(), 
-             temp.getAverage(), "&deg",
+             temp.getAverage(),
              vlDist.getAverage(),
              vlLux.getAverage());
 
