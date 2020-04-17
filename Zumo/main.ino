@@ -57,7 +57,7 @@ class SelfDriving
                 unsigned long t = micros();
                 unsigned long dt = t - lt;                                  //Time difference since last read
                 
-                deg += (double)(gyro.g.z - gyroNoise) * dt / 14050000.0;    //Calculated degrees rotated this itteration, divided by calibrated factor
+                deg += (double)(gyro.g.z - gyroNoise) * dt / 14000000.0;    //Calculated degrees rotated this itteration, divided by calibrated factor
 
                 lt = t;
             }
@@ -80,12 +80,10 @@ class SelfDriving
 
             long g = gyro.g.z - gyroNoise;                              //Get noise reduced gyro reading along z-axis
 
-            if (g > 80 || g < -80)                                      //Ignore readings below threshold value
-            {
-                integral += g;                                          //Add reading to integral
-                int adjust = 0.015 * g + 0.002 * integral;              //Caluclate speed asjustment
-                motors.setSpeeds(speed + adjust, speed - adjust);       //Set new motor speeds
-            }
+            integral += g;                                              //Add reading to integral
+            int adjust = 0.015 * g + 0.002 * integral;                  //Caluclate speed asjustment
+            motors.setSpeeds(speed + adjust, speed - adjust);           //Set new motor speeds
+
             return integral;
         }
 
@@ -140,7 +138,7 @@ class SelfDriving
         */
         bool noLineFound()                                              //Car has 2 seconds to find, and find back to, line if no line is detected
         {
-            const unsigned long timeThreshold = 2000;                   //Time interval before car should rotate 180 deg and go back
+            unsigned long timeThreshold = 2000;                   //Time interval before car should rotate 180 deg and go back
             static unsigned long timeStart = millis();                  //Time since no line was found
             static long integral = 0;
 
@@ -156,6 +154,7 @@ class SelfDriving
                 rotate(180);
                 timeStart = millis();                                   //Update timeStart so car does not turn around again while still no line is found
                 integral = 0;
+                timeThreshold = 2500;
                 motors.setSpeeds(200, 200);
             }
             integral = line(integral, 250);
@@ -386,36 +385,52 @@ class SelfDriving
 
 
         /**
-         * Method that makes the Zumo drive slalom between 10 cones
-         * with a predefined spacing between each cone.
+         * Method that makes the Zumo drive slalom between 3 cones
+         * 
+         * @param coneDist Distance between cones
         */
-        void slalom()
-        {
-            motors.setSpeeds(0, 0);
-            delay(50);
+        void slalom(int coneDist)
+        {   
+            float driveDist = sqrt(2) * coneDist / 200;                     //Trigonometric distance to drive for each cone
             
-            int counts = encoders.getCountsLeft();
-            float coneCounts = 0.5*7425;                                //Cone distance of 0.5m
-            unsigned long time = millis();
+            rotate(-45);                                                    //Assumes pointing cones at start
+            motors.setSpeeds(0,0);
+            delay(100);
 
-            while (encoders.getCountsLeft() - counts < coneCounts) {
-                motors.setSpeeds(200, 200);
+            int direction = 1;                                              //Keeping track of wich direction to rotate
+            for (byte i = 0; i < 3; i++) 
+            {
+                int leftCount = encoders.getCountsAndResetLeft();           //Reset encoders to start distance at zero
+                int rightCount = encoders.getCountsAndResetRight();
+                float dist = 0.0;
+                long integral = 0;
+
+                while (dist < driveDist)
+                {
+                    integral = line(integral, 200);                         //Drive forward
+                    leftCount = encoders.getCountsLeft();
+                    rightCount = encoders.getCountsRight(); 
+                    dist = (leftCount + rightCount)/(2.0*7765.0);           //Calculate distance driven
+                }
+                
+                motors.setSpeeds(0,0);
+                delay(100);
+                rotate(90 * direction);                                     //Rotate at when in line with cone
+
+                while (dist < 2 * driveDist)
+                {
+                    integral = line(integral, 200);                         //Drive forward
+                    leftCount = encoders.getCountsLeft();
+                    rightCount = encoders.getCountsRight(); 
+                    dist = (leftCount + rightCount)/(2.0*7765.0);           //Calculate distance driven
+                }
+
+                direction *= -1;                                            //Set next direction to rotate
             }
 
-            time = millis() - time;
-            
-            for (byte i = 0; i < 10; i++){                              //10 cones
-                rotate(90);
-                motors.setSpeeds(200, 200);
-                delay(time);
-                rotate(-90);
-                motors.setSpeeds(200, 200);
-                delay(time);
-                rotate(-90);
-                motors.setSpeeds(200, 200);
-                delay(time);
-                rotate(90);
-            }
+            motors.setSpeeds(0,0);
+            delay(100);
+            rotate(45 * direction);                                         //Rotate back to start direction
         }
 };
 
@@ -937,7 +952,7 @@ void loop()
             break;
 
         case 6:
-            drive.slalom();                                             //Calls slalom method
+            drive.slalom(config[1]);                                             //Calls slalom method
             intf.enableForceConfig();                                   //Triggers interface menu
             break;
 
