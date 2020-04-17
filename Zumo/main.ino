@@ -343,7 +343,7 @@ class SelfDriving
                 unsigned long timer = millis();
 
                 motors.setSpeeds(200, 200);
-                while (millis() - timer < 1000)  integral = line(integral, 200);
+                while (millis() - timer < 2000)  integral = line(integral, 200);
 
                 motors.setSpeeds(0,0);
                 delay(500);
@@ -358,8 +358,24 @@ class SelfDriving
         void circle()
         {
             motors.setSpeeds(300, 150);
-            delay(3000);
-            motors.setSpeeds(0, 0);
+            
+            double deg = 0.0;
+            unsigned long lt = micros();
+
+            while (abs(deg) < 360)
+            {
+                while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for available gyro data
+                gyro.read();                                                //Read gyro data
+
+                unsigned long t = micros();
+                unsigned long dt = t - lt;                                  //Time difference since last read
+                
+                deg += (double)(gyro.g.z - gyroNoise) * dt / 14500000.0;    //Calculated degrees rotated this itteration, divided by calibrated factor
+
+                lt = t;
+            }
+            motors.setSpeeds(0,0);                                          //Stop motors at end of rotation
+            delay(50);                                                     //Delay to get rid of momentum
         }
 
 
