@@ -111,24 +111,18 @@ class SelfDriving
                 lastTurn = millis();
                 return true;
             }
-            if (millis() - lastTurn < 1500) return true;
-            return false;
+            return millis() - lastTurn < 1500;
         }
 
 
         bool noLine()
         {
-            if (
+            return
                 lineSensorValues[0] < threshold &&          //While each value is under threshold, return true
                 lineSensorValues[1] < threshold &&          //If line is found, return false
                 lineSensorValues[2] < threshold &&
                 lineSensorValues[3] < threshold &&
-                lineSensorValues[4] < threshold
-            ) {
-                return true;
-            }
-            return false;
-
+                lineSensorValues[4] < threshold;
         }
         
         
