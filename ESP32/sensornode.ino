@@ -1,4 +1,14 @@
 /**
+ * Sensornode pin chart:
+ * AlarmSystem: LED1: 18, LED2: 19, Buzzer: 16
+ * VL6180X: I2C: SDAPin: 21, SCLPin: 22
+ * Servo: 26
+ * Ultrasonic: TrigPin: 32, EchoPin: 33
+ * TMP36: 34
+ */
+
+/**
+ * Blynk virtual pin chart
  * V0   Set data points in average calculations
  * V1   TMP36: Momentary temperature reading
  * V2   TMP36: Average temperature reading
@@ -8,8 +18,17 @@
  * V6   VL6180X: Average distance reading
  * V7   VL6180X: Momentary lux reading
  * V8   VL6180X: Average lux reading
- * V9   Terminal
- * V10  Servo
+ * V9   TMP36: Maxima temperature reading
+ * V10  TMP36: Minima temperature reading
+ * V11  HCSR04: Maxima distance reading
+ * V12  HCSR04: Minima distance reading
+ * V13  VL6180X: Maxima distance reading
+ * V14  VL6180X: Minima distance reading
+ * V15  VL6180X: Maxima lux reading
+ * V16  VL6180X: Minima lux reading
+ * V17  Terminal
+ * V18  Servo
+ * V19  Alarm LED
 */
 
 #define BLYNK_PRINT Serial
@@ -20,13 +39,14 @@
 #include <BlynkSimpleEsp32.h>
 #include <ESP32Servo.h>
 #include <Adafruit_VL6180X.h>
+#include <EasyBuzzer.h>
 
 BlynkTimer timer;
 WebServer server;   //Port is 80 as default
 Adafruit_VL6180X vl;
 Servo servo;
 
-int vbuttonState;       //Temporary. Only for testing.
+int vbuttonState;  //ONLY FOR TESTIN. REMOVE LATER WHEN NOT NEEDED ANYMORE.
 
 const char* AUTH = "";
 const char* SSID = "";
@@ -74,6 +94,8 @@ class SensorData {
         T sensorReadingsAverage = 0;                                      // the average
         T sensorReadingsTotal = 0;
         T sensorReadings[50];                                             // the readings from the analog input
+        T maxValue = 0;
+        T minValue = 10000;
 
     protected:
         /**
@@ -87,6 +109,9 @@ class SensorData {
 
             sensorReadingsIndex++;                                          // advance to the next position in the array:
             if (sensorReadingsIndex >= dataPoints) sensorReadingsIndex = 0; // if we're at the end of the array wrap around to the beginning
+
+            if (newReading > maxValue) maxValue = newReading;
+            if (newReading < minValue) minValue = newReading;
         }
 
     public:
@@ -99,9 +124,31 @@ class SensorData {
 
         /**
          * 
+         */
+        int getMax() {
+            return maxValue;
+        }
+
+        /**
+         * 
+         */
+        int getMin() {
+            return minValue;
+        }
+
+        /**
+         * 
         */
         void resetSensorReadings() {
             for (uint8_t i = 0; i < 50; i++) sensorReadings[i] = 0;
+        }
+
+        /**
+         * 
+         */
+        void resetValuesExtrema() {
+            maxValue = 0;
+            minValue = 10000;
         }
 
         /**
@@ -116,7 +163,7 @@ class SensorData {
 /**
  * 
  */
-class alarmSystem : public SensorData<int> {                                //Because use values to determine alarm or not
+class alarmSystem {
     private:
         int alarmLED1;                                                      //Two red alarm LEDs should blink alternately, while alarm sound from buzzer
         int alarmLED2;
@@ -134,7 +181,7 @@ class alarmSystem : public SensorData<int> {                                //Be
 
             alarmLED1 = Led1Pin;
             alarmLED2 = Led2Pin;
-            alarmBuzzer = buzzerPin;
+            EasyBuzzer.setPin(buzzerPin);
         }
 
     /**
@@ -145,27 +192,25 @@ class alarmSystem : public SensorData<int> {                                //Be
         if (toggleAlarmState) {
             digitalWrite(alarmLED1, HIGH);
             digitalWrite(alarmLED2, LOW);
-            //BUZZER HIGH PITCH                         tone-function does not work on ESP
+            EasyBuzzer.beep(1000);                  
             toggleAlarmState = !toggleAlarmState;
         }
 
         else if (!toggleAlarmState) {
             digitalWrite(alarmLED1, LOW);
             digitalWrite(alarmLED2, HIGH);
-            //BUZZER LOW PITCH
+            EasyBuzzer.beep(800);                     
             toggleAlarmState = !toggleAlarmState;
         }
-
-
     }
 
     /**
      * 
      */
     void resetAlarm() {
-        digitalWrite(alarmLED1, LOW);
+        digitalWrite(alarmLED1, LOW);                               //Set LEDs low and stop buzzer                    
         digitalWrite(alarmLED2, LOW);
-        //BUZZER OFF
+        EasyBuzzer.beep(0);                                         
     }
 
 };
@@ -293,7 +338,7 @@ VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
 WidgetTerminal terminal(V9);
 alarmSystem alarmSystem(18, 19, 16);
-WidgetLED BlynkAlarmLED(V12);
+WidgetLED BlynkAlarmLED(V19);
 
 /**
  * Slider for how many values for each point
@@ -321,12 +366,12 @@ BLYNK_WRITE(V9) {
 /**
  * 
 */
-BLYNK_WRITE(V10) {
+BLYNK_WRITE(V18) {
     servo.write(param.asInt()); //writes value from blynk slider to servo
 }
 
 //FOR TESTING PURPOSES ONLY
-BLYNK_WRITE(V11) {
+BLYNK_WRITE(V20) {
     vbuttonState = param.asInt();
 }
 
@@ -352,23 +397,51 @@ void timerEvent() {
 /**
  * 
  */
+void extremaUpdate() {
+    Blynk.virtualWrite(V9, temp.getMax());                          //Pushes all max/min values every 30 s           
+    Blynk.virtualWrite(V10, temp.getMin());
+    Blynk.virtualWrite(V11, dist.getMax());
+    Blynk.virtualWrite(V12, dist.getMin());
+    Blynk.virtualWrite(V13, vlDist.getMax());
+    Blynk.virtualWrite(V14, vlDist.getMin());
+    Blynk.virtualWrite(V15, vlLux.getMax());
+    Blynk.virtualWrite(V16, vlLux.getMin());
+
+    temp.resetValuesExtrema();                                      //Resets all extrema values
+    dist.resetValuesExtrema();
+    vlDist.resetValuesExtrema();
+    vlLux.resetValuesExtrema();
+}
+
+/**
+ * 
+ */
 void timerEventToggleAlarm() {
 
-    if(vbuttonState) {     //Insert some kind of trigger
-        alarmSystem.alarm();
+    static bool resetAlarmOnce;                                     //Interlock to keep buzzer making tikking noise from reset every time timerEventToggleAlarm is called
+
+    if(vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
+
+    //if (alarmTrigger()) {                                           //Will go high as soon as two or more alarm levels is reached
+        alarmSystem.alarm();                                        //Activate alarm system
         BlynkAlarmLED.on();
+        resetAlarmOnce = true;
     }
 
-    if(!vbuttonState) {
-        alarmSystem.resetAlarm(); //Insert some kind of state to reset after back to normal values
+    if(!vbuttonState && resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
+    
+    //if (!alarmTrigger() && resetAlarmOnce) {                        //Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
+        alarmSystem.resetAlarm();                                   //Reset alarm system
         BlynkAlarmLED.off();
+        resetAlarmOnce = false;
+    }
 }
 
 /**
  * 
 */
 BLYNK_APP_CONNECTED() {
-    Blynk.virtualWrite(V0, 10); // Resets slider to 10 when app starts
+    Blynk.virtualWrite(V0, 10);                                     // Resets slider to 10 when app starts
 }
 
 /**
@@ -390,7 +463,39 @@ void handleRoot() {
              vlDist.getAverage(),
              vlLux.getAverage());
 
-    server.send(200, "text/html", buffer);                            //Code 200, display HTML code.
+    server.send(200, "text/html", buffer);                          //Code 200, display HTML code.
+}
+
+/**
+ * 
+ */
+bool alarmTrigger() {
+    static bool ultrasonicAlarm;
+    static bool temperatureAlarm;
+    static bool timeOfFlightAlarm;
+    static bool luxAlarm;
+
+    if (dist.getMin() < 15) ultrasonicAlarm = true;                 //If object is closer than 15 cm, return true
+    else ultrasonicAlarm = false;
+
+    if (temp.getMax() > 25.0) temperatureAlarm = true;              //If tempretaure is greater than 25.0 degrees celsius, return true
+    else temperatureAlarm = false;
+
+    if (vlDist.getMin() < 75) timeOfFlightAlarm = true;             //If object is closar than 75 mm, return true
+    else timeOfFlightAlarm = false;
+
+    if (vlLux.getMax() > 1000.0) luxAlarm = true;                   //If lux level is greater than 1000.0 lux, return true
+    else luxAlarm = false;
+
+    if (
+        ultrasonicAlarm   && temperatureAlarm  ||                   //Every scenario is covered, returns true if two or more alarm limits is reached
+        ultrasonicAlarm   && timeOfFlightAlarm ||
+        ultrasonicAlarm   && luxAlarm          ||
+        temperatureAlarm  && timeOfFlightAlarm ||
+        temperatureAlarm  && luxAlarm          ||
+        timeOfFlightAlarm && luxAlarm
+    ) return true;
+    else return false;
 }
 
 /**
@@ -405,6 +510,7 @@ void setup() {
 
     timer.setInterval(100L, timerEventToggleAlarm);                 //Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
+    timer.setInterval(30000L, extremaUpdate);                       //Timer that pushes max/min values every 30 s interval
     timer.setInterval(60000L, serverUpdate);
 
     dist.resetSensorReadings();                                     // initialize all the readings to 0:
@@ -424,4 +530,5 @@ void loop() {
     Blynk.run();
     timer.run();                                                    // Initiates BlynkTimer
     server.handleClient();                                          //Checking web server to manage occurring events
+    EasyBuzzer.update();
 }
