@@ -271,8 +271,8 @@ class TMP36TemperatureSensor : public SensorData<float> {
          * 
         */
         float getTemperature() {
-            float rawValue = analogRead(inputPin)
-            float temperature = (rawValue -  500) / 10;
+            float rawValue = analogRead(inputPin);
+            float temperature = (rawValue - 500) / 10;
             //Magic happens, temp processed...
             calculateAverage(temperature);
             return temperature;
