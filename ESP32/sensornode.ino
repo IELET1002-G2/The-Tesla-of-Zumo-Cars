@@ -448,21 +448,18 @@ BLYNK_APP_CONNECTED() {
 /**
  * 
 */
-void serverUpdate() {
-    handleRoot();
-}
-
-/**
- * 
-*/
 void handleRoot() {
     char buffer[500];
+    float temperature = temp.getAverage();
+    float lux = vlLux.getAverage();
+    int distance1 = vlDist.getAverage();
+    int distance2 = dist.getAverage();
 
     snprintf(buffer, 500, HTML, 
-             dist.getAverage(), 
-             temp.getAverage(),
-             vlDist.getAverage(),
-             vlLux.getAverage());
+             distance1, 
+             temperature,
+             distance2,
+             lux);
 
     server.send(200, "text/html", buffer);                          //Code 200, display HTML code.
 }
@@ -512,7 +509,6 @@ void setup() {
     timer.setInterval(100L, timerEventToggleAlarm);                 //Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
     timer.setInterval(30000L, extremaUpdate);                       //Timer that pushes max/min values every 30 s interval
-    timer.setInterval(60000L, serverUpdate);
 
     dist.resetSensorReadings();                                     // initialize all the readings to 0:
     temp.resetSensorReadings();
