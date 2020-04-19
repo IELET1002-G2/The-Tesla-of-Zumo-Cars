@@ -156,9 +156,16 @@ class SensorData {
          * 
         */
         void setDataPoints(uint8_t value) {
-            for (uint8_t i = value; i < 50; i++) {
-                sensorReadingsTotal -= sensorReadings[i];
-                sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
+            if (value > dataPoints) {
+                for (uint8_t i = dataPoints - 1; i < value; i++) {
+                    sensorReadingsTotal += sensorReadingsAverage;
+                    sensorReadings[i] = sensorReadingsAverage;
+                }
+            } else {
+                for (uint8_t i = value; i < 50; i++) {
+                    sensorReadingsTotal -= sensorReadings[i];
+                    sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
+                }
             }
             dataPoints = value;
         }
