@@ -479,32 +479,18 @@ void handleRoot() {
  * 
  */
 bool alarmTrigger() {
-    static bool ultrasonicAlarm;
-    static bool temperatureAlarm;
-    static bool timeOfFlightAlarm;
-    static bool luxAlarm;
+    bool ultrasonicAlarm = dist.getMin() < 15;                      //If object is closer than 15 cm, return true
+    bool temperatureAlarm = temp.getMax() > 25.0;                   //If tempretaure is greater than 25.0 degrees celsius, return true
+    bool timeOfFlightAlarm = vlDist.getMin() < 75;                  //If object is closer than 75 mm, return true
+    bool luxAlarm = vlLux.getMax() > 1000.0;                        //If lux level is greater than 1000.0 lux, return true
 
-    if (dist.getMin() < 15) ultrasonicAlarm = true;                 //If object is closer than 15 cm, return true
-    else ultrasonicAlarm = false;
-
-    if (temp.getMax() > 25.0) temperatureAlarm = true;              //If tempretaure is greater than 25.0 degrees celsius, return true
-    else temperatureAlarm = false;
-
-    if (vlDist.getMin() < 75) timeOfFlightAlarm = true;             //If object is closar than 75 mm, return true
-    else timeOfFlightAlarm = false;
-
-    if (vlLux.getMax() > 1000.0) luxAlarm = true;                   //If lux level is greater than 1000.0 lux, return true
-    else luxAlarm = false;
-
-    if (
+    return
         ultrasonicAlarm   && temperatureAlarm  ||                   //Every scenario is covered, returns true if two or more alarm limits is reached
         ultrasonicAlarm   && timeOfFlightAlarm ||
         ultrasonicAlarm   && luxAlarm          ||
         temperatureAlarm  && timeOfFlightAlarm ||
         temperatureAlarm  && luxAlarm          ||
-        timeOfFlightAlarm && luxAlarm
-    ) return true;
-    else return false;
+        timeOfFlightAlarm && luxAlarm;
 }
 
 /**
