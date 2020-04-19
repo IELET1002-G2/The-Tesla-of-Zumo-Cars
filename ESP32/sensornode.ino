@@ -141,6 +141,7 @@ class SensorData {
         */
         void resetSensorReadings() {
             for (uint8_t i = 0; i < 50; i++) sensorReadings[i] = 0;
+            sensorReadingsTotal = 0;
         }
 
         /**
@@ -155,7 +156,10 @@ class SensorData {
          * 
         */
         void setDataPoints(uint8_t value) {
-            for (uint8_t i = value; i < 50; i++) sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
+            for (uint8_t i = value; i < 50; i++) {
+                sensorReadingsTotal -= sensorReadings[i];
+                sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
+            }
             dataPoints = value;
         }
 };
@@ -456,9 +460,9 @@ void handleRoot() {
     int distance2 = dist.getAverage();
 
     snprintf(buffer, 500, HTML, 
-             distance1, 
+             distance2, 
              temperature,
-             distance2,
+             distance1,
              lux);
 
     server.send(200, "text/html", buffer);                          //Code 200, display HTML code.
