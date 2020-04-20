@@ -48,9 +48,9 @@ Servo servo;
 
 int vbuttonState;  //ONLY FOR TESTIN. REMOVE LATER WHEN NOT NEEDED ANYMORE.
 
-const char* AUTH = "XKBPp75lyJ1LLQ8m7PT8cLiCsU8Z8axD";
-const char* SSID = "ForExtraSpecialPeople";
-const char* PASS = "ikealebron";
+const char* AUTH = "";
+const char* SSID = "";
+const char* PASS = "";
 const char* HTML = 
     "<!DOCTYPE html>\
     <html>\
