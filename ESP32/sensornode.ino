@@ -48,9 +48,9 @@ Servo servo;
 
 int vbuttonState;  //ONLY FOR TESTIN. REMOVE LATER WHEN NOT NEEDED ANYMORE.
 
-const char* AUTH = "";
-const char* SSID = "";
-const char* PASS = "";
+const char* AUTH = "XKBPp75lyJ1LLQ8m7PT8cLiCsU8Z8axD";
+const char* SSID = "ForExtraSpecialPeople";
+const char* PASS = "ikealebron";
 const char* HTML = 
     "<!DOCTYPE html>\
     <html>\
@@ -91,8 +91,6 @@ class SensorData {
         uint8_t inputPin;
         uint8_t dataPoints = 10;
         uint8_t sensorReadingsIndex = 0;                                  // the index of the current reading
-        T sensorReadingsAverage = 0;                                      // the average
-        T sensorReadingsTotal = 0;
         T sensorReadings[50];                                             // the readings from the analog input
         T maxValue = 0;
         T minValue = 10000;
@@ -101,14 +99,11 @@ class SensorData {
         /**
          * 
         */
-        void calculateAverage(T newReading) {                               //Method that takes placeholder T for the data type used as argument
-            sensorReadingsTotal -= sensorReadings[sensorReadingsIndex];     // subtract the last reading
+        void addDataPoint(T newReading) {                               //Method that takes placeholder T for the data type used as argument
             sensorReadings[sensorReadingsIndex] = newReading;               // read from the sensor
-            sensorReadingsTotal += newReading;                              // add the reading to the total
-            sensorReadingsAverage = sensorReadingsTotal/dataPoints;         // calculate the average
 
             sensorReadingsIndex++;                                          // advance to the next position in the array:
-            if (sensorReadingsIndex >= dataPoints) sensorReadingsIndex = 0; // if we're at the end of the array wrap around to the beginning
+            if (sensorReadingsIndex == 50) sensorReadingsIndex = 0; // if we're at the end of the array wrap around to the beginning
 
             if (newReading > maxValue) maxValue = newReading;
             if (newReading < minValue) minValue = newReading;
@@ -118,8 +113,15 @@ class SensorData {
         /**
          * 
         */
-        int getAverage() {
-            return sensorReadingsAverage;
+        float getAverage() {
+            float sum = 0;
+            for (byte i = 0; i < dataPoints; i++) {
+                int index = sensorReadingsIndex - i - 1;
+                if (index < 0) index += 50;
+
+                sum += sensorReadings[index];
+            }
+            return sum / dataPoints;
         }
 
         /**
@@ -141,7 +143,6 @@ class SensorData {
         */
         void resetSensorReadings() {
             for (uint8_t i = 0; i < 50; i++) sensorReadings[i] = 0;
-            sensorReadingsTotal = 0;
         }
 
         /**
@@ -156,17 +157,6 @@ class SensorData {
          * 
         */
         void setDataPoints(uint8_t value) {
-            if (value > dataPoints) {
-                for (uint8_t i = dataPoints - 1; i < value; i++) {
-                    sensorReadingsTotal += sensorReadingsAverage;
-                    sensorReadings[i] = sensorReadingsAverage;
-                }
-            } else {
-                for (uint8_t i = value; i < 50; i++) {
-                    sensorReadingsTotal -= sensorReadings[i];
-                    sensorReadings[i] = 0;     // Only deletes data that is not overwritten after data point change
-                }
-            }
             dataPoints = value;
         }
 };
@@ -257,7 +247,7 @@ class HCSR04UltrasonicSensor : public SensorData<int> {
             int duration = pulseIn(echo, HIGH);
             int distance = duration/2*0.0343;  // The speed of sound is 343 m/s
 
-            calculateAverage(distance);
+            addDataPoint(distance);
             return distance;
         }
 };
@@ -285,7 +275,7 @@ class TMP36TemperatureSensor : public SensorData<float> {
             float rawValue = analogRead(inputPin);
             float temperature = (rawValue - 500) / 10;
             //Magic happens, temp processed...
-            calculateAverage(temperature);
+            addDataPoint(temperature);
             return temperature;
         }
 };
@@ -311,7 +301,7 @@ class VL6180XRangeSensor : public SensorData<int> {
             uint8_t distance;
             if (vlPointer->begin()) distance = vlPointer->readRange();  //Accessing members of instance without manually deferencing pointer
 
-            calculateAverage(distance);
+            addDataPoint(distance);
             return distance;
         }
 };
@@ -338,7 +328,7 @@ class VL6180XLuxSensor : public SensorData<float> {
             float lux;
             if (vlPointer->begin()) lux = vlPointer->readLux(VL6180X_ALS_GAIN_5);
 
-            calculateAverage(lux);
+            addDataPoint(lux);
             return lux;
         }
 };
