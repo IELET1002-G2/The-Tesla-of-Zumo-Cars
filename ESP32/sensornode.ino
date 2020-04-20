@@ -85,41 +85,40 @@ const char* HTML =
 /**
  * 
 */
-template<typename T>                                                      //Class Template to make sensor class accept several data types
+template<typename T>                                                // Class Template to make sensor class accept several data types
 class SensorData {
     private:
-        uint8_t inputPin;
         uint8_t dataPoints = 10;
-        uint8_t sensorReadingsIndex = 0;                                  // the index of the current reading
-        T sensorReadings[50];                                             // the readings from the analog input
-        T maxValue = 0;
-        T minValue = 10000;
+        uint8_t writeIndex = 0;                                     // the index of the current reading
+        T sensorReadings[50];                                       // the readings from the analog input
+        T maxReading = 0;
+        T minReading = 10000;
 
     protected:
         /**
          * 
         */
         void addDataPoint(T newReading) {                               //Method that takes placeholder T for the data type used as argument
-            sensorReadings[sensorReadingsIndex] = newReading;               // read from the sensor
+            sensorReadings[writeIndex] = newReading;               // read from the sensor
 
-            sensorReadingsIndex++;                                          // advance to the next position in the array:
-            if (sensorReadingsIndex == 50) sensorReadingsIndex = 0; // if we're at the end of the array wrap around to the beginning
+            writeIndex++;                                          // advance to the next position in the array:
+            if (writeIndex >= 50) writeIndex = 0;                   // if we're at the end of the array wrap around to the beginning
 
-            if (newReading > maxValue) maxValue = newReading;
-            if (newReading < minValue) minValue = newReading;
+            if (newReading > maxReading) maxReading = newReading;
+            if (newReading < minReading) minReading = newReading;
         }
 
     public:
         /**
          * 
         */
-        float getAverage() {
-            float sum = 0;
-            for (byte i = 0; i < dataPoints; i++) {
-                int index = sensorReadingsIndex - i - 1;
-                if (index < 0) index += 50;
+        T getAverage() {
+            T sum = 0;
+            for (uint8_t pointsBack = 1; pointsBack <= dataPoints; pointsBack++) {
+                int8_t readIndex = writeIndex - pointsBack;
+                if (readIndex < 0) readIndex += 50;
 
-                sum += sensorReadings[index];
+                sum += sensorReadings[readIndex];
             }
             return sum / dataPoints;
         }
@@ -128,14 +127,14 @@ class SensorData {
          * 
          */
         int getMax() {
-            return maxValue;
+            return maxReading;
         }
 
         /**
          * 
          */
         int getMin() {
-            return minValue;
+            return minReading;
         }
 
         /**
@@ -149,8 +148,8 @@ class SensorData {
          * 
          */
         void resetValuesExtrema() {
-            maxValue = 0;
-            minValue = 10000;
+            maxReading = 0;
+            minReading = 10000;
         }
 
         /**
