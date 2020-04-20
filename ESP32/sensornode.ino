@@ -89,8 +89,8 @@ template<typename T>                                                // Class Tem
 class SensorData {
     private:
         uint8_t dataPoints = 10;
-        uint8_t writeIndex = 0;                                     // the index of the current reading
-        T sensorReadings[50];                                       // the readings from the analog input
+        uint8_t writeIndex = 0;                                     // The index of the current reading
+        T sensorReadings[50];                                       // The readings from the analog input
         T maxReading = 0;
         T minReading = 10000;
 
@@ -98,14 +98,14 @@ class SensorData {
         /**
          * 
         */
-        void addDataPoint(T newReading) {                               //Method that takes placeholder T for the data type used as argument
-            sensorReadings[writeIndex] = newReading;               // read from the sensor
+        void addDataPoint(T newReading) {                           // Method that takes placeholder T for the data type used as argument
+            sensorReadings[writeIndex] = newReading;                // Read from the sensor
 
-            writeIndex++;                                          // advance to the next position in the array:
-            if (writeIndex >= 50) writeIndex = 0;                   // if we're at the end of the array wrap around to the beginning
+            writeIndex++;                                           // Advance to the next position in the array:
+            if (writeIndex >= 50) writeIndex = 0;                   // If we're at the end of the array wrap around to the beginning
 
-            if (newReading > maxReading) maxReading = newReading;
-            if (newReading < minReading) minReading = newReading;
+            if (newReading > maxReading) maxReading = newReading;   // Update the maxReading if new maximum is reached
+            if (newReading < minReading) minReading = newReading;   // Update the minReading if new minimum is reached
         }
 
     public:
@@ -126,28 +126,28 @@ class SensorData {
         /**
          * 
          */
-        int getMax() {
+        int getMax() {                                              // Method that returns maxReading       
             return maxReading;
         }
 
         /**
          * 
          */
-        int getMin() {
+        int getMin() {                                              // Method that returns minReading
             return minReading;
         }
 
         /**
          * 
         */
-        void resetSensorReadings() {
+        void resetSensorReadings() {                                // Method that resets the sensor reading array
             for (uint8_t i = 0; i < 50; i++) sensorReadings[i] = 0;
         }
 
         /**
          * 
          */
-        void resetValuesExtrema() {
+        void resetValuesExtrema() {                                 // Method that resets the extrema values
             maxReading = 0;
             minReading = 10000;
         }
@@ -155,7 +155,7 @@ class SensorData {
         /**
          * 
         */
-        void setDataPoints(uint8_t value) {
+        void setDataPoints(uint8_t value) {                         // Method to set data points to specified value
             dataPoints = value;
         }
 };
@@ -165,7 +165,7 @@ class SensorData {
  */
 class alarmSystem {
     private:
-        int alarmLED1;                                                      //Two red alarm LEDs should blink alternately, while alarm sound from buzzer
+        int alarmLED1;                                              // Declare variables for use in class
         int alarmLED2;
         int alarmBuzzer;
         bool toggleAlarmState;
@@ -174,10 +174,9 @@ class alarmSystem {
         /**
          * 
          */
-        alarmSystem(int Led1Pin, int Led2Pin, int buzzerPin) {
+        alarmSystem(int Led1Pin, int Led2Pin, int buzzerPin) {      // Two red alarm LEDs should blink alternately, while alarm sound from buzzer
             pinMode(Led1Pin, OUTPUT);
             pinMode(Led2Pin, OUTPUT);
-            pinMode(buzzerPin, OUTPUT);
 
             alarmLED1 = Led1Pin;
             alarmLED2 = Led2Pin;
@@ -189,7 +188,7 @@ class alarmSystem {
      */
     void alarm() {
 
-        if (toggleAlarmState) {
+        if (toggleAlarmState) {                                     // State machine to toggle between LEDs and buzzer pitch
             digitalWrite(alarmLED1, HIGH);
             digitalWrite(alarmLED2, LOW);
             EasyBuzzer.beep(1000);                  
@@ -208,7 +207,7 @@ class alarmSystem {
      * 
      */
     void resetAlarm() {
-        digitalWrite(alarmLED1, LOW);                               //Set LEDs low and stop buzzer                    
+        digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
         digitalWrite(alarmLED2, LOW);
         EasyBuzzer.beep(0);                                         
     }
@@ -243,8 +242,8 @@ class HCSR04UltrasonicSensor : public SensorData<int> {
             delayMicroseconds(10);
             digitalWrite(trigger, LOW);
 
-            int duration = pulseIn(echo, HIGH);
-            int distance = duration/2*0.0343;  // The speed of sound is 343 m/s
+            int duration = pulseIn(echo, HIGH, 25000);              // Timeout needs to be ~ 25 ms long to get full range of sensor (up to four meters)
+            int distance = duration/2*0.0343;                       // The speed of sound is 343 m/s
 
             addDataPoint(distance);
             return distance;
@@ -272,8 +271,9 @@ class TMP36TemperatureSensor : public SensorData<float> {
         */
         float getTemperature() {
             float rawValue = analogRead(inputPin);
-            float temperature = (rawValue - 500) / 10;
-            //Magic happens, temp processed...
+            float voltage = rawValue * 3300.0 / 4095.0;
+            float temperature = (voltage - 500) / 10;
+
             addDataPoint(temperature);
             return temperature;
         }
@@ -333,7 +333,7 @@ class VL6180XLuxSensor : public SensorData<float> {
 };
 
 
-HCSR04UltrasonicSensor dist(32, 33);
+HCSR04UltrasonicSensor dist(32, 33);                                // Create instances of classes
 TMP36TemperatureSensor temp(34);
 VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
@@ -345,7 +345,7 @@ WidgetLED BlynkAlarmLED(V19);
  * Slider for how many values for each point
 */
 BLYNK_WRITE(V0) {
-    uint8_t dataPoints = param.asInt(); // assigning incoming value from V1 to a variable 
+    uint8_t dataPoints = param.asInt();                             // Assigning incoming value from V1 to a variable 
 
     temp.setDataPoints(dataPoints); 
     dist.setDataPoints(dataPoints);
@@ -368,7 +368,7 @@ BLYNK_WRITE(V9) {
  * 
 */
 BLYNK_WRITE(V18) {
-    servo.write(param.asInt()); //writes value from blynk slider to servo
+    servo.write(param.asInt());                                     // Writes value from blynk slider to servo
 }
 
 //FOR TESTING PURPOSES ONLY
@@ -399,7 +399,7 @@ void timerEvent() {
  * 
  */
 void extremaUpdate() {
-    Blynk.virtualWrite(V9, temp.getMax());                          //Pushes all max/min values every 30 s           
+    Blynk.virtualWrite(V9, temp.getMax());                          // Pushes all max/min values every 30 s           
     Blynk.virtualWrite(V10, temp.getMin());
     Blynk.virtualWrite(V11, dist.getMax());
     Blynk.virtualWrite(V12, dist.getMin());
@@ -408,7 +408,7 @@ void extremaUpdate() {
     Blynk.virtualWrite(V15, vlLux.getMax());
     Blynk.virtualWrite(V16, vlLux.getMin());
 
-    temp.resetValuesExtrema();                                      //Resets all extrema values
+    temp.resetValuesExtrema();                                      // Resets all extrema values
     dist.resetValuesExtrema();
     vlDist.resetValuesExtrema();
     vlLux.resetValuesExtrema();
@@ -417,22 +417,40 @@ void extremaUpdate() {
 /**
  * 
  */
+bool alarmTrigger() {
+    bool ultrasonicAlarm = dist.getMin() < 15;                      // If object is closer than 15 cm, return true
+    bool temperatureAlarm = temp.getMax() > 25.0;                   // If tempretaure is greater than 25.0 degrees celsius, return true
+    bool timeOfFlightAlarm = vlDist.getMin() < 75;                  // If object is closer than 75 mm, return true
+    bool luxAlarm = vlLux.getMax() > 1000.0;                        // If lux level is greater than 1000.0 lux, return true
+
+    return
+        ultrasonicAlarm   && temperatureAlarm  ||                   // Every scenario is covered, returns true if two or more alarm limits is reached
+        ultrasonicAlarm   && timeOfFlightAlarm ||
+        ultrasonicAlarm   && luxAlarm          ||
+        temperatureAlarm  && timeOfFlightAlarm ||
+        temperatureAlarm  && luxAlarm          ||
+        timeOfFlightAlarm && luxAlarm;
+}
+
+/**
+ * 
+ */
 void timerEventToggleAlarm() {
 
-    static bool resetAlarmOnce;                                     //Interlock to keep buzzer making tikking noise from reset every time timerEventToggleAlarm is called
+    static bool resetAlarmOnce;                                     // Interlock to keep buzzer making tikking noise from reset every time timerEventToggleAlarm is called
 
     if(vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
 
-    //if (alarmTrigger()) {                                           //Will go high as soon as two or more alarm levels is reached
-        alarmSystem.alarm();                                        //Activate alarm system
+    //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
+        alarmSystem.alarm();                                        // Activate alarm system
         BlynkAlarmLED.on();
         resetAlarmOnce = true;
     }
 
     if(!vbuttonState && resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
     
-    //if (!alarmTrigger() && resetAlarmOnce) {                        //Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
-        alarmSystem.resetAlarm();                                   //Reset alarm system
+    //if (!alarmTrigger() && resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
+        alarmSystem.resetAlarm();                                   // Reset alarm system
         BlynkAlarmLED.off();
         resetAlarmOnce = false;
     }
@@ -461,25 +479,7 @@ void handleRoot() {
              distance1,
              lux);
 
-    server.send(200, "text/html", buffer);                          //Code 200, display HTML code.
-}
-
-/**
- * 
- */
-bool alarmTrigger() {
-    bool ultrasonicAlarm = dist.getMin() < 15;                      //If object is closer than 15 cm, return true
-    bool temperatureAlarm = temp.getMax() > 25.0;                   //If tempretaure is greater than 25.0 degrees celsius, return true
-    bool timeOfFlightAlarm = vlDist.getMin() < 75;                  //If object is closer than 75 mm, return true
-    bool luxAlarm = vlLux.getMax() > 1000.0;                        //If lux level is greater than 1000.0 lux, return true
-
-    return
-        ultrasonicAlarm   && temperatureAlarm  ||                   //Every scenario is covered, returns true if two or more alarm limits is reached
-        ultrasonicAlarm   && timeOfFlightAlarm ||
-        ultrasonicAlarm   && luxAlarm          ||
-        temperatureAlarm  && timeOfFlightAlarm ||
-        temperatureAlarm  && luxAlarm          ||
-        timeOfFlightAlarm && luxAlarm;
+    server.send(200, "text/html", buffer);                          // Code 200, display HTML code.
 }
 
 /**
@@ -488,15 +488,15 @@ bool alarmTrigger() {
 void setup() {
     Serial.begin(115200);                                           // Debug console
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
-    server.begin();                                                 //Initiates web server.
-    server.on("/", handleRoot);                                     //Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
+    server.begin();                                                 // Initiates web server.
+    server.on("/", handleRoot);                                     // Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
     Serial.println("HTTP server started");
 
-    timer.setInterval(100L, timerEventToggleAlarm);                 //Timer that should toggle alarm LED state and buzzer pitch when alarm
+    timer.setInterval(500L, timerEventToggleAlarm);                 // Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
-    timer.setInterval(30000L, extremaUpdate);                       //Timer that pushes max/min values every 30 s interval
+    timer.setInterval(30000L, extremaUpdate);                       // Timer that pushes max/min values every 30 s interval
 
-    dist.resetSensorReadings();                                     // initialize all the readings to 0:
+    dist.resetSensorReadings();                                     // Initialize all the readings to 0
     temp.resetSensorReadings();
     vlDist.resetSensorReadings();
     vlLux.resetSensorReadings();
@@ -512,6 +512,6 @@ void setup() {
 void loop() {
     Blynk.run();
     timer.run();                                                    // Initiates BlynkTimer
-    server.handleClient();                                          //Checking web server to manage occurring events
+    server.handleClient();                                          // Checking web server to manage occurring events
     EasyBuzzer.update();
 }
