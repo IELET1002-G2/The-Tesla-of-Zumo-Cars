@@ -521,6 +521,9 @@ void setup() {
     server.on("/", handleRoot);                                     // Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
     Serial.println("HTTP server started");
 
+    servo.setPeriodHertz(50);                                     // Standard 50hz servo
+    servo.attach(2, 500, 2400);                                   // Servo connected to GPIO2
+
     timer.setInterval(500L, timerEventToggleAlarm);                 // Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
     timer.setInterval(30000L, extremaUpdate);                       // Timer that pushes max/min values every 30 s interval
