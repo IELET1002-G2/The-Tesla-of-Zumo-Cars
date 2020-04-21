@@ -459,6 +459,35 @@ void timerEventToggleAlarm() {
 /**
  * 
 */
+BLYNK_WRITE(V19){                            //Test button for servo alarm
+  int servoTestButton = (param.asInt());     
+  if (servoTestButton == 1) {                
+    timer.setTimer(1000L, servo1, 1);        
+  }
+  else {
+    servo.write(0);                          //if button is not pressed go to 0 degrees
+  }
+}
+
+/**
+ * 
+*/
+void servo1() {                              // function for sweep towards 180 degrees
+  servo.write(180);                          
+  timer.setTimer(1000L, servo2, 1);
+}
+
+/**
+ * 
+*/
+void servo2() {                              // function for sweep towards 0 degrees
+  servo.write(0);
+  Blynk.syncVirtual(V19);                    // checks if button is still pressed or not
+}
+
+/**
+ * 
+*/
 BLYNK_APP_CONNECTED() {
     Blynk.virtualWrite(V0, 10);                                     // Resets slider to 10 when app starts
 }
