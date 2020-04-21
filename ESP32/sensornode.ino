@@ -271,7 +271,7 @@ class TMP36TemperatureSensor : public SensorData<float> {
         */
         float getTemperature() {
             float rawValue = analogRead(inputPin);
-            float voltage = rawValue * 3300.0 / 4095.0;
+            float voltage = rawValue * 2000.0 / 4095.0;
             float temperature = (voltage - 500) / 10;
 
             addDataPoint(temperature);
@@ -515,6 +515,8 @@ void handleRoot() {
  * 
 */
 void setup() {
+    analogSetPinAttenuation(34, ADC_6db);
+
     Serial.begin(115200);                                           // Debug console
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
     server.begin();                                                 // Initiates web server.
