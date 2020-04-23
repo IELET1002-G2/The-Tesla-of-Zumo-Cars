@@ -263,6 +263,7 @@ class TMP36TemperatureSensor : public SensorData<float> {
         */
         TMP36TemperatureSensor(uint8_t pinNumber) {
             pinMode(pinNumber, INPUT);
+            analogSetPinAttenuation(pinNumber, ADC_6db);
             inputPin = pinNumber;  
         }
 
@@ -270,9 +271,8 @@ class TMP36TemperatureSensor : public SensorData<float> {
          * 
         */
         float getTemperature() {
-            float rawValue = analogRead(inputPin);
-            float voltage = rawValue * 2000.0 / 4095.0;
-            float temperature = (voltage - 500) / 10;
+            float voltage = analogRead(inputPin) * 2000.0 / 4095.0;
+            float temperature = (voltage - 500.0) / 10.0;
 
             addDataPoint(temperature);
             return temperature;
