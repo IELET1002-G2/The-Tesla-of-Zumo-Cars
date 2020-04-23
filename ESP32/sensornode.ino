@@ -263,7 +263,7 @@ class TMP36TemperatureSensor : public SensorData<float> {
         */
         TMP36TemperatureSensor(uint8_t pinNumber) {
             pinMode(pinNumber, INPUT);
-            analogSetPinAttenuation(pinNumber, ADC_6db);
+            analogSetPinAttenuation(pinNumber, ADC_6db);            //Sets pin attenuation from 11dB (default) to 6 dB
             inputPin = pinNumber;  
         }
 
@@ -515,8 +515,6 @@ void handleRoot() {
  * 
 */
 void setup() {
-    analogSetPinAttenuation(34, ADC_6db);                           //Sets pin attenuation from 11dB (default) to 6 dB
-
     Serial.begin(115200);                                           // Debug console
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
     server.begin();                                                 // Initiates web server.
