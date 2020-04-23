@@ -1,8 +1,8 @@
 /**
  * Sensornode pin chart:
- * AlarmSystem: LED1: 18, LED2: 19, Buzzer: 16
+ * AlarmSystem: LED1: 18, LED2: 19, Buzzer: 17
  * VL6180X: I2C: SDAPin: 21, SCLPin: 22
- * Servo: 26
+ * Servo: 16
  * Ultrasonic: TrigPin: 32, EchoPin: 33
  * TMP36: 34
  */
@@ -27,8 +27,9 @@
  * V15  VL6180X: Maxima lux reading
  * V16  VL6180X: Minima lux reading
  * V17  Terminal
- * V18  Servo
- * V19  Alarm LED
+ * V18  Blynk Servo Slider
+ * V19  Blynk Servo Test button
+ * V20  Blynk Alarm LED
 */
 
 #define BLYNK_PRINT Serial
@@ -39,10 +40,9 @@
 #include <BlynkSimpleEsp32.h>
 #include <ESP32Servo.h>
 #include <Adafruit_VL6180X.h>
-#include <EasyBuzzer.h>
 
 BlynkTimer timer;
-WebServer server;   //Port is 80 as default
+WebServer server;                                                   //Port is 80 as default
 Adafruit_VL6180X vl;
 Servo servo;
 
@@ -92,7 +92,7 @@ class SensorData {
         uint8_t writeIndex = 0;                                     // The index of the current reading
         T sensorReadings[50];                                       // The readings from the analog input
         T maxReading = 0;
-        T minReading = 10000;
+        T minReading = 150000;
 
     protected:
         /**
@@ -180,7 +180,7 @@ class alarmSystem {
 
             alarmLED1 = Led1Pin;
             alarmLED2 = Led2Pin;
-            EasyBuzzer.setPin(buzzerPin);
+            alarmBuzzer = buzzerPin;
         }
 
     /**
@@ -191,14 +191,14 @@ class alarmSystem {
         if (toggleAlarmState) {                                     // State machine to toggle between LEDs and buzzer pitch
             digitalWrite(alarmLED1, HIGH);
             digitalWrite(alarmLED2, LOW);
-            EasyBuzzer.beep(1000);                  
+            tone(alarmBuzzer, 800);                 
             toggleAlarmState = !toggleAlarmState;
         }
 
         else if (!toggleAlarmState) {
             digitalWrite(alarmLED1, LOW);
             digitalWrite(alarmLED2, HIGH);
-            EasyBuzzer.beep(800);                     
+            tone(alarmBuzzer, 1000);                    
             toggleAlarmState = !toggleAlarmState;
         }
     }
@@ -209,7 +209,7 @@ class alarmSystem {
     void resetAlarm() {
         digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
         digitalWrite(alarmLED2, LOW);
-        EasyBuzzer.beep(0);                                         
+        noTone(alarmBuzzer);                                         
     }
 
 };
@@ -338,8 +338,8 @@ TMP36TemperatureSensor temp(34);
 VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
 WidgetTerminal terminal(V9);
-alarmSystem alarmSystem(18, 19, 16);
-WidgetLED BlynkAlarmLED(V19);
+alarmSystem alarmSystem(18, 19, 17);
+WidgetLED BlynkAlarmLED(V20);
 
 /**
  * Slider for how many values for each point
@@ -372,7 +372,7 @@ BLYNK_WRITE(V18) {
 }
 
 //FOR TESTING PURPOSES ONLY
-BLYNK_WRITE(V20) {
+BLYNK_WRITE(V21) {
     vbuttonState = param.asInt();
 }
 
@@ -459,20 +459,20 @@ void timerEventToggleAlarm() {
 /**
  * 
 */
-BLYNK_WRITE(V19){                            //Test button for servo alarm
+BLYNK_WRITE(V19){                                                   //Test button for servo alarm
   int servoTestButton = (param.asInt());     
   if (servoTestButton == 1) {                
     timer.setTimer(1000L, servo1, 1);        
   }
   else {
-    servo.write(0);                          //if button is not pressed go to 0 degrees
+    servo.write(0);                                                 //if button is not pressed go to 0 degrees
   }
 }
 
 /**
  * 
 */
-void servo1() {                              // function for sweep towards 180 degrees
+void servo1() {                                                     // function for sweep towards 180 degrees
   servo.write(180);                          
   timer.setTimer(1000L, servo2, 1);
 }
@@ -480,9 +480,9 @@ void servo1() {                              // function for sweep towards 180 d
 /**
  * 
 */
-void servo2() {                              // function for sweep towards 0 degrees
+void servo2() {                                                     // function for sweep towards 0 degrees
   servo.write(0);
-  Blynk.syncVirtual(V19);                    // checks if button is still pressed or not
+  Blynk.syncVirtual(V19);                                           // checks if button is still pressed or not
 }
 
 /**
@@ -515,7 +515,7 @@ void handleRoot() {
  * 
 */
 void setup() {
-    analogSetPinAttenuation(34, ADC_6db);
+    analogSetPinAttenuation(34, ADC_6db);                           //Sets pin attenuation from 11dB (default) to 6 dB
 
     Serial.begin(115200);                                           // Debug console
     Blynk.begin(AUTH, SSID, PASS, IPAddress(91,192,221,40), 8080);
@@ -523,8 +523,8 @@ void setup() {
     server.on("/", handleRoot);                                     // Manage HTTP request and run handleRoot() when "IP"/ is searched in browser.
     Serial.println("HTTP server started");
 
-    servo.setPeriodHertz(50);                                     // Standard 50hz servo
-    servo.attach(2, 500, 2400);                                   // Servo connected to GPIO2
+    servo.setPeriodHertz(50);                                       // Standard 50hz servo
+    servo.attach(16, 500, 2400);                                    // Servo connected to GPIO16
 
     timer.setInterval(500L, timerEventToggleAlarm);                 // Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
@@ -547,5 +547,4 @@ void loop() {
     Blynk.run();
     timer.run();                                                    // Initiates BlynkTimer
     server.handleClient();                                          // Checking web server to manage occurring events
-    EasyBuzzer.update();
 }
