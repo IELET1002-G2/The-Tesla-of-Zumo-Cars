@@ -169,6 +169,8 @@ class alarmSystem {
         int alarmLED2;
         int alarmBuzzer;
         bool toggleAlarmState;
+        bool testButtonState;
+        bool testState;
 
     public:
         /**
@@ -183,35 +185,69 @@ class alarmSystem {
             alarmBuzzer = buzzerPin;
         }
 
-    /**
-     * 
-     */
-    void alarm() {
+        /**
+         * 
+         */
+        void alarm() {
 
-        if (toggleAlarmState) {                                     // State machine to toggle between LEDs and buzzer pitch
-            digitalWrite(alarmLED1, HIGH);
+            if (toggleAlarmState) {                                     // State machine to toggle between LEDs and buzzer pitch
+                digitalWrite(alarmLED1, HIGH);
+                digitalWrite(alarmLED2, LOW);
+                tone(alarmBuzzer, 800);                 
+                toggleAlarmState = !toggleAlarmState;
+            }
+
+            else if (!toggleAlarmState) {
+                digitalWrite(alarmLED1, LOW);
+                digitalWrite(alarmLED2, HIGH);
+                tone(alarmBuzzer, 1000);                    
+                toggleAlarmState = !toggleAlarmState;
+            }
+        }
+
+        /**
+         * 
+         */
+        void resetAlarm() {
+            digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
             digitalWrite(alarmLED2, LOW);
-            tone(alarmBuzzer, 800);                 
-            toggleAlarmState = !toggleAlarmState;
+            noTone(alarmBuzzer);                                         
+        }
+        
+        /**
+         * 
+        */
+        void setButtonState(bool value) {
+            testButtonState = value;
         }
 
-        else if (!toggleAlarmState) {
-            digitalWrite(alarmLED1, LOW);
-            digitalWrite(alarmLED2, HIGH);
-            tone(alarmBuzzer, 1000);                    
-            toggleAlarmState = !toggleAlarmState;
+        /**
+         * 
+        */
+        bool getButtonState() {
+            return testButtonState;
         }
-    }
 
-    /**
-     * 
-     */
-    void resetAlarm() {
-        digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
-        digitalWrite(alarmLED2, LOW);
-        noTone(alarmBuzzer);                                         
-    }
+        /**
+         * 
+        */
+        void setTest() {
+          testState = true;
+        }
 
+        /**
+         * 
+        */
+        void resetTest() {
+          testState = false;
+        }
+
+        /**
+         * 
+        */
+        bool isTest() {
+          return testState;
+        }
 };
 
 /**
@@ -460,30 +496,31 @@ void timerEventToggleAlarm() {
  * 
 */
 BLYNK_WRITE(V19){                                                   //Test button for servo alarm
-  int servoTestButton = (param.asInt());     
-  if (servoTestButton == 1) {                
-    timer.setTimer(1000L, servo1, 1);        
-  }
-  else {
-    servo.write(0);                                                 //if button is not pressed go to 0 degrees
-  }
+    bool servoTest = param.asInt();
+    if (servoTest) alarmSystem.setTest();
+    alarmSystem.setButtonState(servoTest);    
 }
 
 /**
  * 
 */
-void servo1() {                                                     // function for sweep towards 180 degrees
-  servo.write(180);                          
-  timer.setTimer(1000L, servo2, 1);
-}
+void sweep() {
+    static bool endDirection = true;
+    static bool direction = true;
+    
+    if (alarmSystem.isTest()) {
+        if (!alarmSystem.getButtonState()) {
+            direction = endDirection;
+            endDirection = !endDirection;
+            alarmSystem.resetTest();
+        }
 
-/**
- * 
-*/
-void servo2() {                                                     // function for sweep towards 0 degrees
-  servo.write(0);
-  Blynk.syncVirtual(V19);                                           // checks if button is still pressed or not
-}
+        if (direction) servo.write(180);
+        else servo.write(0);
+
+        direction = !direction;
+    }    
+} 
 
 /**
  * 
@@ -527,6 +564,7 @@ void setup() {
     timer.setInterval(500L, timerEventToggleAlarm);                 // Timer that should toggle alarm LED state and buzzer pitch when alarm
     timer.setInterval(1000L, timerEvent);                           // Setup a function to be called every second and minute
     timer.setInterval(30000L, extremaUpdate);                       // Timer that pushes max/min values every 30 s interval
+    timer.setInterval(1000L, sweep);
 
     dist.resetSensorReadings();                                     // Initialize all the readings to 0
     temp.resetSensorReadings();
