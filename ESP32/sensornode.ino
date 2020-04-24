@@ -337,7 +337,7 @@ HCSR04UltrasonicSensor dist(32, 33);                                // Create in
 TMP36TemperatureSensor temp(34);
 VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
-WidgetTerminal terminal(V9);
+WidgetTerminal terminal(V17);
 alarmSystem alarmSystem(18, 19, 17);
 WidgetLED BlynkAlarmLED(V20);
 
@@ -356,7 +356,7 @@ BLYNK_WRITE(V0) {
 /**
  * 
 */
-BLYNK_WRITE(V9) {
+BLYNK_WRITE(V17) {
     terminal.println(temp.getTemperature());
     terminal.println(dist.getDistance());
     terminal.println(vlDist.getDistance());
@@ -443,7 +443,7 @@ void timerEventToggleAlarm() {
 
     //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
         alarmSystem.alarm();                                        // Activate alarm system
-        BlynkAlarmLED.on();
+        //BlynkAlarmLED.on();   //NY INDIKATOR! APPVARSEL!
         resetAlarmOnce = true;
     }
 
@@ -451,7 +451,7 @@ void timerEventToggleAlarm() {
     
     //if (!alarmTrigger() && resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
         alarmSystem.resetAlarm();                                   // Reset alarm system
-        BlynkAlarmLED.off();
+        //BlynkAlarmLED.off();
         resetAlarmOnce = false;
     }
 }
