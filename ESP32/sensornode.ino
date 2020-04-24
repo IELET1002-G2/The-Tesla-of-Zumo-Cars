@@ -393,11 +393,30 @@ BLYNK_WRITE(V0) {
  * 
 */
 BLYNK_WRITE(V17) {
-    terminal.println(temp.getTemperature());
-    terminal.println(dist.getDistance());
-    terminal.println(vlDist.getDistance());
-    terminal.println(vlLux.getLux());
-    terminal.flush();
+    if (String("help") == param.asStr()) {
+        terminal.clear();
+        terminal.println("Terminal commands:"); terminal.println("-----------------------------");
+        terminal.println("\"values\" - Get readings from sensors");
+        terminal.println("\"clear\"  - Clear terminal");
+    }
+
+    else if (String("values") == param.asStr()) {                                                             // Print sensor data to terminal
+        terminal.print("Temperature:      "); terminal.print(temp.getTemperature()); terminal.println(" °C"); // Print data for every sensor
+        terminal.print("Dist. ultrasonic: "); terminal.print(dist.getDistance());    terminal.println(" cm");
+        terminal.print("Dist. ToF:        "); terminal.print(vlDist.getDistance());  terminal.println(" mm");
+        terminal.print("Lux:              "); terminal.print(vlLux.getLux());        terminal.println(" lux");
+    }
+
+    else if (String("clear") == param.asStr()) {                    // Clear terminal
+        terminal.clear();
+        terminal.println("Done.");
+    }
+
+    else {
+        terminal.println("The command you provided does not exist.");
+    }
+
+    terminal.flush();                                               // Ensure that all is sent to Blynk
 }
 
 /**
@@ -572,7 +591,8 @@ void setup() {
     vlLux.resetSensorReadings();
 
     terminal.clear(); 
-    terminal.println(F("blynk program running"));
+    terminal.println(F("Blynk program running"));
+    terminal.println(F("Type \"help\" for commands"));
     terminal.flush();
 }
 
