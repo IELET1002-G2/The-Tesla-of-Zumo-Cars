@@ -186,8 +186,8 @@ class AlarmSystem {
         int alarmLED2;
         int alarmBuzzer;
         bool toggleAlarmState;
-        bool testButtonState;
-        bool testState;
+        bool nextServoState;
+        bool servoState;
 
     public:
         /**
@@ -234,36 +234,36 @@ class AlarmSystem {
         /**
          * 
         */
-        void setButtonState(bool value) {
-            testButtonState = value;
+        void setNextServoState(bool value) {
+            nextServoState = value;
         }
 
         /**
          * 
         */
-        bool getButtonState() {
-            return testButtonState;
+        bool getNextServoState() {
+            return nextServoState;
         }
 
         /**
          * 
         */
-        void setTest() {
-          testState = true;
+        void servoOn() {
+          servoState = true;
         }
 
         /**
          * 
         */
-        void resetTest() {
-          testState = false;
+        void servoOff() {
+          servoState = false;
         }
 
         /**
          * 
         */
-        bool isTest() {
-          return testState;
+        bool isServoOn() {
+          return servoState;
         }
 };
 
@@ -537,23 +537,22 @@ bool alarmTrigger() {
 void toggleAlarm() {
 
     static bool resetAlarmOnce;                                     // Interlock to keep alarmsystem from resetting every 500 ms when no alarm
-    static bool alarmLEDOnOnce = true;                              // Interlck to prevent weird sensor readings due to continuous BlynkAlarmLED.on() call on alarm
+    static bool alarmLEDOnOnce = true;                              // Interlck to prevent weird sensor readings due to continuous BlynkAlarmLED.on() call on alarm    
 
-    if(vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
-
+    if (vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
     //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
         alarmSystem.alarm();                                        // Activate alarm system
+        alarmSystem.servoOn();
+        alarmSystem.setNextServoState(true);
 
         if (alarmLEDOnOnce) {
             BlynkAlarmLED.on();
             alarmLEDOnOnce = false;
         }
         resetAlarmOnce = true;
-    }
-
-    if(!vbuttonState && resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
-    
-    //if (!alarmTrigger() && resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
+    } else if (resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
+    //else if (resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
+        alarmSystem.setNextServoState(false);
         alarmSystem.resetAlarm();                                   // Reset alarm system
         BlynkAlarmLED.off();
         resetAlarmOnce = false;
@@ -565,9 +564,9 @@ void toggleAlarm() {
  * Configures servo test if test button is activated. Stores state of button
  * each time button state changes
 */
-BLYNK_WRITE(V19){                                                   
-    alarmSystem.setTest();
-    alarmSystem.setButtonState(param.asInt());
+BLYNK_WRITE(V19) {                                                   
+    alarmSystem.servoOn();
+    alarmSystem.setNextServoState(param.asInt());
 }
 
 /**
@@ -579,12 +578,11 @@ void sweepServo() {
     static bool endPosition = true;                                 // State machine that alters end position of servo
     static bool position = true;                                    // State machine that alters position of servo
     
-    if (alarmSystem.isTest() /*|| alarm.isAlarm()*/) {              // Servo condition. Test or alarm activated
-        if (!alarmSystem.getButtonState() /*|| alarm.getAlarmState()*/) { // End condition. Test button off
+    if (alarmSystem.isServoOn()) {                                     // Servo condition. Test or alarm activated
+        if (!alarmSystem.getNextServoState()) {                        // End condition. Test button off
             position = endPosition;
             endPosition = !endPosition;
-            alarmSystem.resetTest();                                      // Resets to default configuration
-            /*alarm.resetAlarm()*/
+            alarmSystem.servoOff();// Resets to default configuration
         }
 
         if (position) servo.write(180);
