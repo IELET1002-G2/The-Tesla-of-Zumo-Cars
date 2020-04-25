@@ -186,10 +186,11 @@ class AlarmSystem {
         int alarmLED2;
         int alarmBuzzer;
         bool toggleAlarmState;
-        bool nextServoState;
-        bool servoState;
 
     public:
+        bool servoState;
+        bool nextServoState;
+
         /**
          * 
          */
@@ -229,41 +230,6 @@ class AlarmSystem {
             digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
             digitalWrite(alarmLED2, LOW);
             noTone(alarmBuzzer);                                         
-        }
-        
-        /**
-         * 
-        */
-        void setNextServoState(bool value) {
-            nextServoState = value;
-        }
-
-        /**
-         * 
-        */
-        bool getNextServoState() {
-            return nextServoState;
-        }
-
-        /**
-         * 
-        */
-        void servoOn() {
-          servoState = true;
-        }
-
-        /**
-         * 
-        */
-        void servoOff() {
-          servoState = false;
-        }
-
-        /**
-         * 
-        */
-        bool isServoOn() {
-          return servoState;
         }
 };
 
@@ -542,8 +508,8 @@ void toggleAlarm() {
     if (vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
     //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
         alarmSystem.alarm();                                        // Activate alarm system
-        alarmSystem.servoOn();
-        alarmSystem.setNextServoState(true);
+        alarmSystem.servoState = true;
+        alarmSystem.nextServoState = true;
 
         if (alarmLEDOnOnce) {
             BlynkAlarmLED.on();
@@ -552,7 +518,7 @@ void toggleAlarm() {
         resetAlarmOnce = true;
     } else if (resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
     //else if (resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
-        alarmSystem.setNextServoState(false);
+        alarmSystem.nextServoState = false;
         alarmSystem.resetAlarm();                                   // Reset alarm system
         BlynkAlarmLED.off();
         resetAlarmOnce = false;
@@ -565,8 +531,8 @@ void toggleAlarm() {
  * each time button state changes
 */
 BLYNK_WRITE(V19) {                                                   
-    alarmSystem.servoOn();
-    alarmSystem.setNextServoState(param.asInt());
+    alarmSystem.servoState = true;
+    alarmSystem.nextServoState = param.asInt();
 }
 
 /**
@@ -578,11 +544,11 @@ void sweepServo() {
     static bool endPosition = true;                                 // State machine that alters end position of servo
     static bool position = true;                                    // State machine that alters position of servo
     
-    if (alarmSystem.isServoOn()) {                                     // Servo condition. Test or alarm activated
-        if (!alarmSystem.getNextServoState()) {                        // End condition. Test button off
+    if (alarmSystem.servoState) {                                     // Servo condition. Test or alarm activated
+        if (!alarmSystem.nextServoState) {                        // End condition. Test button off
             position = endPosition;
             endPosition = !endPosition;
-            alarmSystem.servoOff();// Resets to default configuration
+            alarmSystem.servoState = false;// Resets to default configuration
         }
 
         if (position) servo.write(180);
