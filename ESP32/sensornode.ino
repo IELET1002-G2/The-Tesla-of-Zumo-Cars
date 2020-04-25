@@ -88,7 +88,6 @@ const char* HTML =          // HTML code to be run on web server
  * inherited by derived sensor class, but inheritance can be omitted. Should always
  * be constructed using explicit arguments, 
  * e.g. class derived : public SensorData<int> or SensorData<int> object;
- * 
  * @param T type of numbers to be processed, e.g. int and float
 */
 template<typename T>
@@ -106,7 +105,6 @@ class SensorData {
          * array. Stores data with FIFO-method. Fills up entire array before
          * wrapping around to the beginning. Also keeps track of the minimum and 
          * maximum readings
-         * 
          * @param newReading new sensor reading to be appended
         */
         void addDataPoint(T newReading) {
@@ -123,7 +121,6 @@ class SensorData {
         /**
          * Calculates running average of a user defined number of data points by 
          * summing up the last "dataPoints"-amount of readings 
-         * 
          * @returns running average
         */
         T getAverage() {
@@ -169,7 +166,6 @@ class SensorData {
         /**
          * Sets number of data points getAverage() should use when calculating
          * the running average
-         * 
          * @param value the number of data points
         */
         void setDataPoints(uint8_t value) {
@@ -178,56 +174,54 @@ class SensorData {
 };
 
 /**
- * 
+ * Contains methods and state machines relating to alarm. Can have multiple
+ * instances, but would require additional functions to work as intended
  */
 class AlarmSystem {
     private:
-        int alarmLED1;                                              // Declare variables for use in class
-        int alarmLED2;
-        int alarmBuzzer;
-        bool toggleAlarmState;
+        uint8_t alarmLED1;
+        uint8_t alarmLED2;
+        uint8_t alarmBuzzer;
+        bool alarmState;                                            // State machine for toggling LEDs and buzzers pitch
 
     public:
-        bool servoState;
-        bool nextServoState;
+        bool servoState;                                            // State machine storing if servo is on
+        bool nextServoState;                                        // State machine storing next servo state
 
         /**
-         * 
+         * Constructs object with pin numbers and configures pins
+         * @param led1Pin the pin for LED1
+         * @param led2Pin the pin for LED2
+         * @param buzzerPin the pin for buzzer
          */
-        AlarmSystem(int Led1Pin, int Led2Pin, int buzzerPin) {      // Two red alarm LEDs should blink alternately, while alarm sound from buzzer
-            pinMode(Led1Pin, OUTPUT);
-            pinMode(Led2Pin, OUTPUT);
+        AlarmSystem(uint8_t led1Pin, uint8_t led2Pin, uint8_t buzzerPin) {
+            pinMode(led1Pin, OUTPUT);
+            pinMode(led2Pin, OUTPUT);
 
-            alarmLED1 = Led1Pin;
-            alarmLED2 = Led2Pin;
+            alarmLED1 = led1Pin;
+            alarmLED2 = led2Pin;
             alarmBuzzer = buzzerPin;
         }
 
         /**
-         * 
+         * Activates alarm with alternating blinking between LED1 and LED2, and
+         * toggles buzzers pitch
          */
-        void alarm() {
+        void on() {
+            digitalWrite(alarmLED1, alarmState);
+            digitalWrite(alarmLED2, !alarmState);
 
-            if (toggleAlarmState) {                                     // State machine to toggle between LEDs and buzzer pitch
-                digitalWrite(alarmLED1, HIGH);
-                digitalWrite(alarmLED2, LOW);
-                tone(alarmBuzzer, 800);                 
-                toggleAlarmState = !toggleAlarmState;
-            }
+            if (alarmState) tone(alarmBuzzer, 800);
+            else tone(alarmBuzzer, 1000);
 
-            else if (!toggleAlarmState) {
-                digitalWrite(alarmLED1, LOW);
-                digitalWrite(alarmLED2, HIGH);
-                tone(alarmBuzzer, 1000);                    
-                toggleAlarmState = !toggleAlarmState;
-            }
+            alarmState = !alarmState;
         }
 
         /**
-         * 
+         * Deactivating alarm by setting LEDs low and stops buzzer
          */
-        void resetAlarm() {
-            digitalWrite(alarmLED1, LOW);                               // Set LEDs low and stops buzzer                    
+        void off() {
+            digitalWrite(alarmLED1, LOW);                 
             digitalWrite(alarmLED2, LOW);
             noTone(alarmBuzzer);                                         
         }
@@ -246,7 +240,6 @@ class HCSR04UltrasonicSensor : public SensorData<int> {
     public:
         /**
          * Constructs object with pin numbers and configures pins
-         * 
          * @param trigPin the output to sensor
          * @param echopin the input from sensor
         */
@@ -261,7 +254,6 @@ class HCSR04UltrasonicSensor : public SensorData<int> {
         /**
          * Sends pulse and waits for it to return. Measures the duration and 
          * calculates the distance to the object
-         * 
          * @returns distance the distance to the object in centimeters
         */
         int getDistance() {
@@ -289,7 +281,6 @@ class TMP36TemperatureSensor : public SensorData<float> {
     public:
         /**
          * Constructs object with pin number and configures pin
-         * 
          * @param pinNumber the input from sensor
         */
         TMP36TemperatureSensor(uint8_t pinNumber) {
@@ -300,7 +291,6 @@ class TMP36TemperatureSensor : public SensorData<float> {
 
         /**
          * Calculates temperature based on input
-         * 
          * @returns temperature the calculated temperature in celsius
         */
         float getTemperature() {
@@ -312,7 +302,6 @@ class TMP36TemperatureSensor : public SensorData<float> {
         }
 };
 
-/**
 /**
  * Contains method for reading VL6180X range sensor in millimeters. Needs an instance
  * of Adafruit_VL6180X. Derived from SensorData with type float. Class serves only to
@@ -331,7 +320,6 @@ class VL6180XRangeSensor : public SensorData<int> {
         }
         /**
          * Receives range from I2C if sensor is available
-         * 
          * @returns distance the distance to the object in millimeters
         */
         uint8_t getDistance() {
@@ -362,7 +350,6 @@ class VL6180XLuxSensor : public SensorData<float> {
 
         /**
          * Receives lux from I2C if sensor is available
-         * 
          * @returns lux the lux measured in lux
         */
         float getLux() {
@@ -374,14 +361,21 @@ class VL6180XLuxSensor : public SensorData<float> {
         }
 };
 
-
-HCSR04UltrasonicSensor dist(32, 33);                                // Create instances of classes
+HCSR04UltrasonicSensor dist(32, 33);
 TMP36TemperatureSensor temp(34);
 VL6180XRangeSensor vlDist(&vl);
 VL6180XLuxSensor vlLux(&vl);
 AlarmSystem alarmSystem(18, 19, 17);
 WidgetTerminal terminal(V17);
-WidgetLED BlynkAlarmLED(V20);
+WidgetLED blynkAlarmLED(V20);
+
+/**
+ * Resets data point slider to 10. Called each time Blynk app starts. Requires
+ * that notify is enabled in Blynk app
+*/
+BLYNK_APP_CONNECTED() {
+    Blynk.virtualWrite(V0, 10);                                     
+}
 
 /**
  * Slider in Blynk app that sets the number of data points the running average 
@@ -397,32 +391,32 @@ BLYNK_WRITE(V0) {
 }
 
 /**
- * 
+ * Terminal for sending commands and displaying sensor data in Blynk app.
+ * "help" displayes commands, "values" displayes sensor readings, and "clear"
+ * clears the terminal
 */
 BLYNK_WRITE(V17) {
-    if (String("help") == param.asStr()) {
-        terminal.clear();
-        terminal.println("Terminal commands:"); terminal.println("-----------------------------");
-        terminal.println("\"values\" - Get readings from sensors");
-        terminal.println("\"clear\"  - Clear terminal");
-    }
+    String command = param.asStr();
 
-    else if (String("values") == param.asStr()) {                                                             // Print sensor data to terminal
-        terminal.print("Temperature:      "); terminal.print(temp.getTemperature()); terminal.println(" °C"); // Print data for every sensor
+    if (command == "help") {
+        terminal.println("Terminal commands:");
+        terminal.println("------------------------------------");
+        terminal.println("\"values\" - Get readings from sensors");
+        terminal.println("\"ip\"     - Get web server IP");
+        terminal.println("\"clear\"  - Clear terminal");
+    } else if (command == "values") {
+        terminal.print("Temperature:      "); terminal.print(temp.getTemperature()); terminal.println(" °C");
         terminal.print("Dist. ultrasonic: "); terminal.print(dist.getDistance());    terminal.println(" cm");
         terminal.print("Dist. ToF:        "); terminal.print(vlDist.getDistance());  terminal.println(" mm");
         terminal.print("Lux:              "); terminal.print(vlLux.getLux());        terminal.println(" lux");
-    }
-
-    else if (String("clear") == param.asStr()) {                    // Clear terminal
+    } else if (command == "ip") {
+        terminal.print("Web server IP: "); 
+        terminal.println(WiFi.localIP());                           // Show ESP32 IP on terminal
+    } else if (command == "clear") {
         terminal.clear();
-        terminal.println("Done.");
-    }
-
-    else {
+    } else {
         terminal.println("The command you provided does not exist.");
     }
-
     terminal.flush();                                               // Ensure that all is sent to Blynk
 }
 
@@ -433,11 +427,19 @@ BLYNK_WRITE(V18) {
     servo.write(param.asInt());
 }
 
+/**
+ * Configures servo test if test button is activated. Stores state of button
+ * each time button state changes
+*/
+BLYNK_WRITE(V19) {                                                   
+    alarmSystem.servoState = true;
+    alarmSystem.nextServoState = param.asInt();
+}
+
 //FOR TESTING PURPOSES ONLY
 BLYNK_WRITE(V21) {
     vbuttonState = param.asInt();
 }
-
 
 /**
  * Sends real time and average readings to Blynk server every 1 second.
@@ -477,8 +479,59 @@ void sendMaxAndMin() {
 }
 
 /**
+ * Timer that keeps track of alarm triggers and activates alarm. Deactivates
+ * alarm if alarm triggers are no longer present. Mainly serves as timer for
+ * toggling LEDs and buzzer pitch
+ */
+void toggleAlarm() {
+    static bool resetAlarm;                                         // Interlock to keep alarm from resetting every 500 ms when no alarm
+    static bool activateLED = true;                                 // Interlock to prevent weird sensor readings due to continuous blynkAlarmLED.on() call on alarm    
+
+    if (vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
+    //if (alarmTrigger()) {                                         // Will go high as soon as two or more alarm levels is reached
+        alarmSystem.on();                                           // Activate alarm
+        resetAlarm = true;
+        alarmSystem.servoState = true;
+        alarmSystem.nextServoState = true;
+
+        if (activateLED) {
+            blynkAlarmLED.on();
+            activateLED = false;
+        }
+    } else if (resetAlarm) {                                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
+        alarmSystem.off();                                          // Deactivate alarm
+        blynkAlarmLED.off();
+        activateLED = true;
+        resetAlarm = false;
+        alarmSystem.nextServoState = false;
+    }
+}
+
+/**
+ * Timer that sweeps servo from between 0 and 180 degrees if test button is 
+ * activated or if alarm is active. Should not have an interval less than 1
+ * second because of indecisive servo position
+*/
+void sweepServo() {
+    static bool endPosition = true;                                 // State machine that alters end position of servo
+    static bool position = true;                                    // State machine that alters position of servo
+    
+    if (alarmSystem.servoState) {                                         // Servo condition. Test or alarm activated
+        if (!alarmSystem.nextServoState) {                          // End condition. Test button off
+            position = endPosition;
+            endPosition = !endPosition;
+            alarmSystem.servoState = false;                         // Resets to default configuration
+        }
+
+        if (position) servo.write(180);
+        else servo.write(0);
+
+        position = !position;
+    }    
+}
+
+/**
  * Checks if maximum or minimum readings is in accordance with thresholds
- * 
  * @returns true if two or more sensors have readings not in accordance 
  *      with thresholds, false otherwise
  */
@@ -495,75 +548,6 @@ bool alarmTrigger() {
         temperatureAlarm  && timeOfFlightAlarm ||
         temperatureAlarm  && luxAlarm          ||
         timeOfFlightAlarm && luxAlarm;
-}
-
-/**
- * 
- */
-void toggleAlarm() {
-
-    static bool resetAlarmOnce;                                     // Interlock to keep alarmsystem from resetting every 500 ms when no alarm
-    static bool alarmLEDOnOnce = true;                              // Interlck to prevent weird sensor readings due to continuous BlynkAlarmLED.on() call on alarm    
-
-    if (vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
-    //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
-        alarmSystem.alarm();                                        // Activate alarm system
-        alarmSystem.servoState = true;
-        alarmSystem.nextServoState = true;
-
-        if (alarmLEDOnOnce) {
-            BlynkAlarmLED.on();
-            alarmLEDOnOnce = false;
-        }
-        resetAlarmOnce = true;
-    } else if (resetAlarmOnce) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMENT NEXT LINE.
-    //else if (resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
-        alarmSystem.nextServoState = false;
-        alarmSystem.resetAlarm();                                   // Reset alarm system
-        BlynkAlarmLED.off();
-        resetAlarmOnce = false;
-        alarmLEDOnOnce = true;
-    }
-}
-
-/**
- * Configures servo test if test button is activated. Stores state of button
- * each time button state changes
-*/
-BLYNK_WRITE(V19) {                                                   
-    alarmSystem.servoState = true;
-    alarmSystem.nextServoState = param.asInt();
-}
-
-/**
- * Timer that sweeps servo from between 0 and 180 degrees if test button is 
- * activated or if alarm is active. Should not have an interval less than 1
- * second because of indecisive servo position
-*/
-void sweepServo() {
-    static bool endPosition = true;                                 // State machine that alters end position of servo
-    static bool position = true;                                    // State machine that alters position of servo
-    
-    if (alarmSystem.servoState) {                                     // Servo condition. Test or alarm activated
-        if (!alarmSystem.nextServoState) {                        // End condition. Test button off
-            position = endPosition;
-            endPosition = !endPosition;
-            alarmSystem.servoState = false;// Resets to default configuration
-        }
-
-        if (position) servo.write(180);
-        else servo.write(0);
-
-        position = !position;
-    }    
-} 
-
-/**
- * Resets data point slider to 10. Called each time Blynk app starts. Requires
- * that notify is enabled in Blynk app
-*/
-BLYNK_APP_CONNECTED() {
-    Blynk.virtualWrite(V0, 10);                                     
 }
 
 /**
