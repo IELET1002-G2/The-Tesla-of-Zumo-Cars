@@ -492,13 +492,18 @@ bool alarmTrigger() {
  */
 void timerEventToggleAlarm() {
 
-    static bool resetAlarmOnce;                                     // Interlock to keep buzzer making tikking noise from reset every time timerEventToggleAlarm is called
+    static bool resetAlarmOnce;                                     // Interlock to keep alarmsystem from resetting every 500 ms when no alarm
+    static bool alarmLEDOnOnce = true;                              // Interlck to prevent weird sensor readings due to continuous BlynkAlarmLED.on() call on alarm
 
     if(vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
 
     //if (alarmTrigger()) {                                           // Will go high as soon as two or more alarm levels is reached
         alarmSystem.alarm();                                        // Activate alarm system
-        //BlynkAlarmLED.on();   //NY INDIKATOR! APPVARSEL!
+
+        if (alarmLEDOnOnce) {
+            BlynkAlarmLED.on();
+            alarmLEDOnOnce = false;
+        }
         resetAlarmOnce = true;
     }
 
@@ -506,8 +511,9 @@ void timerEventToggleAlarm() {
     
     //if (!alarmTrigger() && resetAlarmOnce) {                        // Will reset alarm when false, but may be a bit slow, due to sensor values new every 30 s
         alarmSystem.resetAlarm();                                   // Reset alarm system
-        //BlynkAlarmLED.off();
+        BlynkAlarmLED.off();
         resetAlarmOnce = false;
+        alarmLEDOnOnce = true;
     }
 }
 
