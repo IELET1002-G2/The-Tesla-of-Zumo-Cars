@@ -83,6 +83,60 @@ const char* HTML =          // HTML code to be run on web server
     </html>";
 
 /**
+ * Contains methods and state machines relating to alarm. Can have multiple
+ * instances, but would require additional functions to work as intended
+ */
+class AlarmSystem {
+    private:
+        uint8_t alarmLED1;
+        uint8_t alarmLED2;
+        uint8_t alarmBuzzer;
+        bool alarmState;                                            // State machine for toggling LEDs and buzzers pitch
+
+    public:
+        bool servoState;                                            // State machine storing if servo is on
+        bool nextServoState;                                        // State machine storing next servo state
+
+        /**
+         * Constructs object with pin numbers and configures pins
+         * @param led1Pin the pin for LED1
+         * @param led2Pin the pin for LED2
+         * @param buzzerPin the pin for buzzer
+         */
+        AlarmSystem(uint8_t led1Pin, uint8_t led2Pin, uint8_t buzzerPin) {
+            pinMode(led1Pin, OUTPUT);
+            pinMode(led2Pin, OUTPUT);
+
+            alarmLED1 = led1Pin;
+            alarmLED2 = led2Pin;
+            alarmBuzzer = buzzerPin;
+        }
+
+        /**
+         * Activates alarm with alternating blinking between LED1 and LED2, and
+         * toggles buzzers pitch
+         */
+        void on() {
+            digitalWrite(alarmLED1, alarmState);
+            digitalWrite(alarmLED2, !alarmState);
+
+            if (alarmState) tone(alarmBuzzer, 800);
+            else tone(alarmBuzzer, 1000);
+
+            alarmState = !alarmState;
+        }
+
+        /**
+         * Deactivating alarm by setting LEDs low and stops buzzer
+         */
+        void off() {
+            digitalWrite(alarmLED1, LOW);                 
+            digitalWrite(alarmLED2, LOW);
+            noTone(alarmBuzzer);                                         
+        }
+};
+
+/**
  * Class template for storing and processing data read from sensors. Contains
  * methods for adding, manipulating and reading data. Should preferably be 
  * inherited by derived sensor class, but inheritance can be omitted. Should always
@@ -170,60 +224,6 @@ class SensorData {
         */
         void setDataPoints(uint8_t value) {
             dataPoints = value;
-        }
-};
-
-/**
- * Contains methods and state machines relating to alarm. Can have multiple
- * instances, but would require additional functions to work as intended
- */
-class AlarmSystem {
-    private:
-        uint8_t alarmLED1;
-        uint8_t alarmLED2;
-        uint8_t alarmBuzzer;
-        bool alarmState;                                            // State machine for toggling LEDs and buzzers pitch
-
-    public:
-        bool servoState;                                            // State machine storing if servo is on
-        bool nextServoState;                                        // State machine storing next servo state
-
-        /**
-         * Constructs object with pin numbers and configures pins
-         * @param led1Pin the pin for LED1
-         * @param led2Pin the pin for LED2
-         * @param buzzerPin the pin for buzzer
-         */
-        AlarmSystem(uint8_t led1Pin, uint8_t led2Pin, uint8_t buzzerPin) {
-            pinMode(led1Pin, OUTPUT);
-            pinMode(led2Pin, OUTPUT);
-
-            alarmLED1 = led1Pin;
-            alarmLED2 = led2Pin;
-            alarmBuzzer = buzzerPin;
-        }
-
-        /**
-         * Activates alarm with alternating blinking between LED1 and LED2, and
-         * toggles buzzers pitch
-         */
-        void on() {
-            digitalWrite(alarmLED1, alarmState);
-            digitalWrite(alarmLED2, !alarmState);
-
-            if (alarmState) tone(alarmBuzzer, 800);
-            else tone(alarmBuzzer, 1000);
-
-            alarmState = !alarmState;
-        }
-
-        /**
-         * Deactivating alarm by setting LEDs low and stops buzzer
-         */
-        void off() {
-            digitalWrite(alarmLED1, LOW);                 
-            digitalWrite(alarmLED2, LOW);
-            noTone(alarmBuzzer);                                         
         }
 };
 
@@ -324,7 +324,7 @@ class VL6180XRangeSensor : public SensorData<int> {
         */
         uint8_t getDistance() {
             uint8_t distance;
-            if (vlPointer->begin()) distance = vlPointer->readRange();  //Accessing members of instance without manually deferencing pointer
+            if (vlPointer->begin()) distance = vlPointer->readRange();  //Accessing members of object without manually dereferencing pointer
 
             addDataPoint(distance);
             return distance;
@@ -516,13 +516,12 @@ void sweepServo() {
     static bool endPosition = true;                                 // State machine that alters end position of servo
     static bool position = true;                                    // State machine that alters position of servo
     
-    if (alarmSystem.servoState) {                                         // Servo condition. Test or alarm activated
-        if (!alarmSystem.nextServoState) {                          // End condition. Test button off
+    if (alarmSystem.servoState) {                                   // Servo condition true when test or alarm activated
+        if (!alarmSystem.nextServoState) {                          // End condition true when test or alarm is deactivated
             position = endPosition;
             endPosition = !endPosition;
             alarmSystem.servoState = false;                         // Resets to default configuration
         }
-
         if (position) servo.write(180);
         else servo.write(0);
 
@@ -553,7 +552,8 @@ bool alarmTrigger() {
 /**
  * Sends formated HTML code showing sensor readings to web server. Buffer should
  * be increased HTML code is increased. Called each time server.handleClient() 
- * registers an event on "IP"/
+ * registers an event on "IP"/. Do not call functions as arguments in snprintf()
+ * since it will not format properly
 */
 void handleRoot() {
     char buffer[600];
