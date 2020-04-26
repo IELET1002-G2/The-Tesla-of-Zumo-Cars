@@ -203,36 +203,28 @@ class SelfDriving
          * polynomial to regulate motor speeds. Is used to follow 
          * black line on ground.
         */
-        void followLine(int batteryLevel, bool emergencyPower = false, bool fastMode = false)
+        void followLine(int batteryLevel, bool emergencyPower = false)
         {
             if (sensorInitInterlock) { 
                 lineSensors.initFiveSensors(); 
-
                 sensorInitInterlock = false;                            //If followObject() is called after followLine() has been called, initiate front prox. sensor  
             } 
 
             int value = lineSensors.readLine(lineSensorValues);         //Gets line sensor readings from array and returns an int from 0-4000 
             float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction factor for battery level
 
-            if (fastMode) {                                             //Fast mode
-                leftSpeed = 4.00E+02 - 8.00E+02*exp(-2.50E-03*value);   //Speed is set by exponential functions
-                rightSpeed = 4.00E+02 - 3.63E-02*exp(+2.50E-03*value);
-            }
-            else {
-                leftSpeed =                                             //Left motor speed is equal to a polynomial to the 4th degree where the variable 
-                    -4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
-                    +1.04E+00*pow(value, 1)                             //The polynomial is icreasing in Df with values 
-                    -6.63E-04*pow(value, 2)                             //Vf = [-400, 400].
-                    +1.80E-07*pow(value, 3)                             //There is a saddle point at (2000, 200).
-                    -1.67E-11*pow(value, 4);
-
-                rightSpeed =                                            //Right motor speed is equal to a polynomial to the 4th degree where the variable
-                    +4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
-                    -1.07E-01*pow(value, 1)                             //The polynomial is decreasing in Df with values 
-                    -1.03E-04*pow(value, 2)                             //Vf = [-400, 400].
-                    +8.67E-08*pow(value, 3)                             //There is a saddle point at (2000, 200).
-                    -1.67E-11*pow(value, 4);
-            }
+            leftSpeed =                                                 //Left motor speed is equal to a polynomial to the 4th degree where the variable 
+                -4.00E+02*pow(value, 0)                                 //is the sensor value with Df = [0, 4000].
+                +8.88E-01*pow(value, 1)                                 //The polynomial is increasing in Df with values 
+                -5.06E-04*pow(value, 2)                                 //Vf = [-400, 400].
+                +1.34E-07*pow(value, 3) 
+                -1.26E-11*pow(value, 4);    
+            rightSpeed =                                                //Right motor speed is equal to a polynomial to the 4th degree where the variable
+                +4.00E+02*pow(value, 0)                                 //is the sensor value with Df = [0, 4000].
+                -6.95E-02*pow(value, 1)                                 //The polynomial is decreasing in Df with values 
+                -9.72E-05*pow(value, 2)                                 //Vf = [-400, 400].
+                +6.63E-08*pow(value, 3)
+                -1.26E-11*pow(value, 4);
 
             leftSpeed *= batteryCorr;                                   //Correct the speed according to the battery level
             rightSpeed *= batteryCorr;
