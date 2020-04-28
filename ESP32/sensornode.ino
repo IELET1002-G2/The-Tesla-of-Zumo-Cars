@@ -421,10 +421,11 @@ BLYNK_WRITE(V17) {
 }
 
 /**
- * Slider in Blynk app that sets the position of servo between 0 and 180 degrees
+ * Slider in Blynk app that sets the position of servo between 0 and 180 degrees.
+ * Interlocked with alarm so user can not interfere servo during alarm
 */
 BLYNK_WRITE(V18) {
-    servo.write(param.asInt());
+    if (!alarmTrigger) servo.write(param.asInt());
 }
 
 /**

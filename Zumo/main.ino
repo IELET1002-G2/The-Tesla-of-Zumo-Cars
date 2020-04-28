@@ -13,9 +13,6 @@ Zumo32U4Encoders encoders;
 Zumo32U4LineSensors lineSensors;
 Zumo32U4ProximitySensors proxSensors;
 
-
-
-
 /**
  * Class containing methods for different driving configurations of the Zumo32U4.
  * Some methods include PD-regulated driving configurations, while others do not.
@@ -23,25 +20,22 @@ Zumo32U4ProximitySensors proxSensors;
  * line sensors, motor encoders, the gyro and the front proximity sensors are
  * applied where applicable. Should only declare object once.
 */
-class SelfDriving
-{
+class SelfDriving {
     private:
-
         unsigned int lineSensorValues[5];                               //Declare array to store the five readings from line sensors
-
         bool sensorInitInterlock;                                       //Bool as interlock when switching between followLine and followObject
         int leftSpeed;
         int rightSpeed;
         long gyroNoise;
         const int threshold = 300;                                      //Threshold for line sensors
 
-
         /**
          * Method that uses the gyro to rotate the Zumo to
          * the set number of degrees given in method argument.
+         * 
+         * @param degrees the number of degrees (negative or positive)
         */
-        void rotate(int degrees)
-        {
+        void rotate(int degrees) {
             if (degrees < 0) motors.setSpeeds(200, -180);                   //Determine what direction to rotate
             else motors.setSpeeds(-200, 180);                               //Different motor speeds due to asymetric motor power
             degrees = abs(degrees);
@@ -49,8 +43,7 @@ class SelfDriving
             double deg = 0.0;
             unsigned long lt = micros();
 
-            while (abs(deg) < degrees)
-            {
+            while (abs(deg) < degrees) {
                 while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for available gyro data
                 gyro.read();                                                //Read gyro data
 
@@ -58,13 +51,11 @@ class SelfDriving
                 unsigned long dt = t - lt;                                  //Time difference since last read
                 
                 deg += (double)(gyro.g.z - gyroNoise) * dt / 14000000.0;    //Calculated degrees rotated this itteration, divided by calibrated factor
-
                 lt = t;
             }
             motors.setSpeeds(0,0);                                          //Stop motors at end of rotation
             delay(50);                                                      //Delay to get rid of momentum
         }
-
 
         /**
          * A PI-regulated line stabilisation method that uses the 
@@ -73,8 +64,7 @@ class SelfDriving
          * @param integral previously returned integral
          * @param speed target motor speed
         */
-        long line(long integral, int speed)
-        {
+        long line(long integral, int speed) {
             while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for new available
             gyro.read();                                                //Read latest gyro data
 
@@ -87,13 +77,14 @@ class SelfDriving
             return integral;
         }
 
-
         /**
          * Method that uses the line sensor values to return a bool
          * if a right turn or a left turn is detected.
+         * 
+         * @returns true while a turn is detected and while it is under
+         *      300 ms since a turn was detected, false otherwise
         */
-        bool turnDetect()
-        {
+        bool turnDetect() {
             static unsigned long lastTurn = 0;
             lineSensors.readLine(lineSensorValues);
             if (lineSensorValues[0] > threshold || lineSensorValues[4] > threshold)
@@ -104,14 +95,14 @@ class SelfDriving
             return millis() - lastTurn < 300;
         }
 
-
         /**
          * A method that uses the line sensor values and a threshold to
          * return true/false whether the Zumo is above a black line on
          * the floor or not.
+         * 
+         * @returns true if no line is detected, false otherwise
         */
-        bool noLine()
-        {
+        bool noLine() {
             return
                 lineSensorValues[0] < threshold &&          //While each value is under threshold, return true
                 lineSensorValues[1] < threshold &&          //If line is found, return false
@@ -120,19 +111,18 @@ class SelfDriving
                 lineSensorValues[4] < threshold;
         }
 
-
     public:
-        
-        
         /**
          * Method that returns true or false based on whether a black 
          * line is found or not. It uses other methods such as turnDetect()
          * and noLine() to drive straight forward, rotate 180 degrees and
-         * drive back.
+         * drive back. Car has 2 seconds to find, and find back to, line if 
+         * no line is detected
+         * 
+         * @returns true if not on line, false otherwise
         */
-        bool noLineFound()                                              //Car has 2 seconds to find, and find back to, line if no line is detected
-        {
-            unsigned long timeThreshold = 2000;                   //Time interval before car should rotate 180 deg and go back
+        bool noLineFound() {
+            unsigned long timeThreshold = 2000;                         //Time interval before car should rotate 180 deg and go back
             static unsigned long timeStart = millis();                  //Time since no line was found
             static long integral = 0;
 
@@ -143,8 +133,7 @@ class SelfDriving
                 return false;
             }
 
-            if (millis() - timeStart > timeThreshold)                   //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
-            {
+            if (millis() - timeStart > timeThreshold) {                 //If car has not found line in 2 seconds, rotate 180 deg and drive straight back
                 rotate(180);
                 timeStart = millis();                                   //Update timeStart so car does not turn around again while still no line is found
                 integral = 0;
@@ -155,22 +144,19 @@ class SelfDriving
             return true;
         }
 
-
         /**
          * Method that calibrates the line sensors and the gyro.
          * This method should be called before any other method
          * that depends on the line sensor/gyro is called. Examples
          * are followLine() and line().
         */
-        void calibrateSensors() 
-        {
+        void calibrateSensors() {
             sensorInitInterlock = false;                                //Interlock bool to keep Zumo from initiating line sensors 
                                                                         //every time followLine method is called
             lineSensors.initFiveSensors();                              //Initiate the five line sensors on front array of Zumo
 
             Wire.begin();                                               //Open I2C comunication
             gyro.init();                                                //Establish comunication with gyro
-
             gyro.writeReg(gyro.CTRL1, 0b11111111);                      //800 Hz output data rate, low-pass filter cutoff 100 Hz
             gyro.writeReg(gyro.CTRL4, 0b00100000);                      //2000 dps full scale
             gyro.writeReg(gyro.CTRL5, 0b00000000);                      //High-pass filter disabled
@@ -178,61 +164,51 @@ class SelfDriving
             delay(500);                                                 //Delay to ensure zumo is stable for gyro calibration
             
             gyroNoise = 0;
-            for (int i = 0; i < 100; i++)
-            {
+            for (int i = 0; i < 100; i++) {
                 while(!gyro.readReg(gyro.STATUS_REG));                  //Wait for available gyro data
                 gyro.read();                                            //Read latest gyro data
                 gyroNoise += gyro.g.z;                                  
             }
             gyroNoise /= 100;
 
-            for (int t = 0; t <= 200; t++) {                            //For loop that lasts for 4000 ms where t is time in ms
-
+            for (int t = 0; t <= 200; t++) {
                 lineSensors.calibrate();                                //Calibrates line sensors for every iteration of loop
-
-                int speed = 400*sin(PI/100*t);                          //Rotation of car is described by a sine function where T = 4000 ms
-                
+                int speed = 400*sin(PI/100*t);                          //Rotation of car is described by a sine function
                 motors.setSpeeds(speed, -speed);                        //Zumo rotates with speed depending on sine function
                 delay(1);                                               //Delay to manage period time
             }
         }
 
-
         /**
          * Method that uses the line sensor values and a predefined 
          * polynomial to regulate motor speeds. Is used to follow 
          * black line on ground.
+         * 
+         * @param batteryLevel the batteryLevel
+         * @param emergencyPower the switch for activating remaining 
+         *      10 % of battery power
         */
-        void followLine(int batteryLevel, bool emergencyPower = false, bool fastMode = false)
-        {
+        void followLine(int batteryLevel = 100, bool emergencyPower = false) {
             if (sensorInitInterlock) { 
                 lineSensors.initFiveSensors(); 
-
                 sensorInitInterlock = false;                            //If followObject() is called after followLine() has been called, initiate front prox. sensor  
             } 
 
             int value = lineSensors.readLine(lineSensorValues);         //Gets line sensor readings from array and returns an int from 0-4000 
             float batteryCorr = 1.00E+00 - exp(-1.00E-01*batteryLevel); //Correction factor for battery level
 
-            if (fastMode) {                                             //Fast mode
-                leftSpeed = 4.00E+02 - 8.00E+02*exp(-2.50E-03*value);   //Speed is set by exponential functions
-                rightSpeed = 4.00E+02 - 3.63E-02*exp(+2.50E-03*value);
-            }
-            else {
-                leftSpeed =                                             //Left motor speed is equal to a polynomial to the 4th degree where the variable 
-                    -4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
-                    +1.04E+00*pow(value, 1)                             //The polynomial is icreasing in Df with values 
-                    -6.63E-04*pow(value, 2)                             //Vf = [-400, 400].
-                    +1.80E-07*pow(value, 3)                             //There is a saddle point at (2000, 200).
-                    -1.67E-11*pow(value, 4);
-
-                rightSpeed =                                            //Right motor speed is equal to a polynomial to the 4th degree where the variable
-                    +4.00E+02*pow(value, 0)                             //is the sensor value with Df = [0, 4000].
-                    -1.07E-01*pow(value, 1)                             //The polynomial is decreasing in Df with values 
-                    -1.03E-04*pow(value, 2)                             //Vf = [-400, 400].
-                    +8.67E-08*pow(value, 3)                             //There is a saddle point at (2000, 200).
-                    -1.67E-11*pow(value, 4);
-            }
+            leftSpeed =                                                 //Left motor speed is equal to a polynomial to the 4th degree where the variable 
+                -4.00E+02*pow(value, 0)                                 //is the sensor value with Df = [0, 4000].
+                +8.88E-01*pow(value, 1)                                 //The polynomial is increasing in Df with values 
+                -5.06E-04*pow(value, 2)                                 //Vf = [-400, 400].
+                +1.34E-07*pow(value, 3) 
+                -1.26E-11*pow(value, 4);    
+            rightSpeed =                                                //Right motor speed is equal to a polynomial to the 4th degree where the variable
+                +4.00E+02*pow(value, 0)                                 //is the sensor value with Df = [0, 4000].
+                -6.95E-02*pow(value, 1)                                 //The polynomial is decreasing in Df with values 
+                -9.72E-05*pow(value, 2)                                 //Vf = [-400, 400].
+                +6.63E-08*pow(value, 3)
+                -1.26E-11*pow(value, 4);
 
             leftSpeed *= batteryCorr;                                   //Correct the speed according to the battery level
             rightSpeed *= batteryCorr;
@@ -245,15 +221,16 @@ class SelfDriving
             motors.setSpeeds(leftSpeed, rightSpeed);                    //Set corrected motor speeds to motors
         }
 
-
         /**
          * A PD-regulated driving configuration method that uses the 
          * line sensor values as input for the regulator.
          *  
          * @param speed target motor speed
+         * @param batteryLevel the batteryLevel
+         * @param emergencyPower the switch for activating remaining 
+         *      10 % of battery power
         */
-        void followLinePD(int speed, int batteryLevel = 100, bool emergencyPower = false)
-        {
+        void followLinePD(int speed, int batteryLevel = 100, bool emergencyPower = false) {
             static int last = 0;
 
             if (sensorInitInterlock) { 
@@ -278,7 +255,6 @@ class SelfDriving
             last = error;                                                   //Store error for next deriavative
         }
 
-
         /**
          * This method makes the Zumo follow an object that reflects
          * IR rays well. It uses the two front IR diodes on the car to
@@ -287,8 +263,7 @@ class SelfDriving
          * When an object is within range (~ 30-40 cm), it follows that
          * object. Otherwise scans if no object within range.
         */
-        void followObject()
-        {
+        void followObject() {
             if (!sensorInitInterlock) { 
                 proxSensors.initFrontSensor();                          //Need to call this function in order to use the front prox. sensor
                                                                         //Can only use front prox. sensor when full line sensor array in use
@@ -318,20 +293,15 @@ class SelfDriving
             }
 
             if ((leftReading > 5) || (rightReading > 5)) motors.setSpeeds(0, 0);                     //Object must be very close (less than 30 cm) to an object, stop motors as a preventive measure 
-
             else if (leftReading > rightReading) motors.setSpeeds(driveSpeed, turnSpeed);            //Object is to the left, turn left 
-
             else if (leftReading < rightReading) motors.setSpeeds(turnSpeed, driveSpeed);            //Objct is to the right, turn right
-
             else motors.setSpeeds(driveSpeed, driveSpeed);                                           //Object is directly in front of Zumo, drive towards object 
         }
-
 
         /**
          * Method that makes the Zumo drive in a square pattern.
         */
-        void square()
-        {
+        void square() {
             for (byte n = 0; n < 4; n++) {
                 long integral = 0;
                 unsigned long timer = millis();
@@ -345,19 +315,16 @@ class SelfDriving
             }
         }
 
-
         /**
          * Method that makes the Zumo drive in a circle pattern.
         */
-        void circle()
-        {
+        void circle() {
             motors.setSpeeds(300, 150);
             
             double deg = 0.0;
             unsigned long lt = micros();
 
-            while (abs(deg) < 360)
-            {
+            while (abs(deg) < 360) {
                 while(!gyro.readReg(gyro.STATUS_REG));                      //Wait for available gyro data
                 gyro.read();                                                //Read gyro data
 
@@ -369,19 +336,16 @@ class SelfDriving
                 lt = t;
             }
             motors.setSpeeds(0,0);                                          //Stop motors at end of rotation
-            delay(50);                                                     //Delay to get rid of momentum
+            delay(50);                                                      //Delay to get rid of momentum
         }
-
 
         /**
          * Method that makes the Zumo drive in back and forth in 
          * a straight line Drives forwards for 2000 ms, rotates
          * 180 degrees and drives back.
         */
-        void backAndForth()
-        {
-            for (byte i = 0; i < 2; i++)
-            {
+        void backAndForth() {
+            for (byte i = 0; i < 2; i++) {
                 long integral = 0;
                 unsigned long timer = millis();
 
@@ -393,14 +357,12 @@ class SelfDriving
             }
         }
 
-
         /**
          * Method that makes the Zumo drive slalom between 3 cones
          * 
          * @param coneDist Distance between cones
         */
-        void slalom(int coneDist)
-        {   
+        void slalom(int coneDist) {   
             float driveDist = sqrt(2) * coneDist / 200;                     //Trigonometric distance to drive for each cone
             
             rotate(-45);                                                    //Assumes pointing cones at start
@@ -408,15 +370,13 @@ class SelfDriving
             delay(100);
 
             int direction = 1;                                              //Keeping track of wich direction to rotate
-            for (byte i = 0; i < 3; i++) 
-            {
+            for (byte i = 0; i < 3; i++) {
                 int leftCount = encoders.getCountsAndResetLeft();           //Reset encoders to start distance at zero
                 int rightCount = encoders.getCountsAndResetRight();
                 float dist = 0.0;
                 long integral = 0;
 
-                while (dist < driveDist)
-                {
+                while (dist < driveDist) {
                     integral = line(integral, 200);                         //Drive forward
                     leftCount = encoders.getCountsLeft();
                     rightCount = encoders.getCountsRight(); 
@@ -427,8 +387,7 @@ class SelfDriving
                 delay(100);
                 rotate(90 * direction);                                     //Rotate at when in line with cone
 
-                while (dist < 2 * driveDist)
-                {
+                while (dist < 2 * driveDist) {
                     integral = line(integral, 200);                         //Drive forward
                     leftCount = encoders.getCountsLeft();
                     rightCount = encoders.getCountsRight(); 
@@ -444,17 +403,14 @@ class SelfDriving
         }
 };
 
-
 /**
  * Containing methods for interfacing with Zumo32U4 car including graphical user 
  * inteface with buttons, LCD-display and Serial monitor. Also includes more advanced
  * printing functions than native to the Zumo32U4LCD class. Should only have one 
  * object and should not be inherited. Class only sorts similar and related functions
 */
-class Interface
-{
+class Interface {
     private:
-
         bool forceConfig = true;                                        //Variable that controls whether or not buttons are required to prompt configuration.
         int config[2] = {0, 0};                                         //Array stores mode and configuration.
 
@@ -521,9 +477,7 @@ class Interface
             else return false;
         };
 
-
     public:
-
         /**
          * User interface for choosing mode and configure mode through either 
          * buttons and LCD-display, or serial monitor
@@ -719,28 +673,22 @@ class Interface
         }     
 };
 
-
-
 /**
  * Class containing methods for calculation of speed and displacement. These methods
  * rely on the motor encoders for calculations. Should only declare object once.
 */
-class Motion
-{
+class Motion {
     private:
-
-        float momSpeed;
-        float avgSpeed;
+        float speed;
         float trip = 0.0;
         float distance = 0.0;
         float displacement = 0.0;
 
-
         /**
-         * Method that calculates trip, distance and displacement.
+         * Method that calculates trip, distance and displacement in meters.
+         * Also calculates current speed in meters per second
         */
-        void calculateMotion()
-        {
+        void calculateMotion() {
             static unsigned long timer;                                 //Timer to save time interval
 
             int leftCount = encoders.getCountsAndResetLeft();           //Reads the left encoder's value
@@ -754,174 +702,132 @@ class Motion
             distance += avgDist;                                        //Accumulate distance
             displacement += avgDisp;                                    //Accumulate displacement
 
-            momSpeed = avgDisp/(millis() - timer)*1000;                 //Momentary speed
+            speed = avgDisp/(millis() - timer)*1000;                    //Momentary speed
             timer = millis(); 
         }
 
-
-        /**
-         * Method that calculates the Zumo's average speed.
-        */
-        float getAverageSpeed()
-        {
-            static unsigned long timer1 = millis();
-            static unsigned long timer2 = millis();
-            static unsigned long timeOver70;
-            static unsigned long counter;
-            static float sumOfSpeeds;
-            static float highestSpeed;
-            float maxSpeed;
-
-            if (momSpeed > highestSpeed) highestSpeed = momSpeed;
-            if (momSpeed < 0.7*maxSpeed) timer2 = millis();
-
-            timeOver70 += millis() - timer2;
-
-            if (momSpeed < 0) {
-                sumOfSpeeds += momSpeed;
-                counter++;
-                
-                if (millis() - timer1 >= 6000) {
-                    avgSpeed = sumOfSpeeds/counter;
-
-                    sumOfSpeeds = 0;
-                    counter = 0;
-                    timer1 = millis();
-
-                    return avgSpeed;
-                }
-            }
-        }
-
-
     public:
-
         /**
-         * Method that calculates trip, distance and displacement,
-         * and returns momentary speed.
+         * Method that calles calculateMotion() and returns the 
+         * momentary speed in meters per second
+         * 
+         * @returns speed the momentary speed
         */
-        float getSpeed()
-        {
-            calculateMotion();                                          //Calculates the motion
-            return momSpeed;                                            //Returns the momentary speed
+        float getSpeed() {
+            calculateMotion();
+            return speed;
         }
 
-
         /**
-         * Method that calculates trip, distance and displacement,
-         * and returns distance.
+         * Method that calles calculateMotion() and returns the 
+         * distance in meters
+         * 
+         * @returns distance the distance traveled since start
         */
-        float getDistance()
-        {
-            calculateMotion();                                          //Calculates the motion
-            return distance;                                            //Returns the distance
+        float getDistance() {
+            calculateMotion();
+            return distance;
         }
 
-
         /**
-         * Method that calculates trip, distance and displacement,
-         * and returns displacement.
+         * Method that calles calculateMotion() and returns the 
+         * displacement in meters
+         * 
+         * @returns displacement the displacement in line length
+         *      between start position and current position
         */
-        float getDisplacement()
-        {
-            calculateMotion();                                          //Calculates the motion
-            return displacement;                                        //Returns the displacement
+        float getDisplacement() {
+            calculateMotion();
+            return displacement;
         } 
-        
 
         /**
-         * Method that calculates trip, distance and displacement,
-         * and returns trip.
+         * Method that calles calculateMotion() and returns the 
+         * trip counter in meters
+         * 
+         * @returns trip the distance traveled since trip reset
         */
-        float getTrip()
-        {
-            calculateMotion();                                          //Calculates the motion
-            return trip;                                                //Returns the trip counter
+        float getTrip() {
+            calculateMotion();
+            return trip;
         }
 
         /**
          * Method that sets trip value.
+         * 
+         * @param value the value trip should be set to in meters
         */
-        void setTrip(int value)
-        {
-            trip = value;                                               //Sets trip value
+        void setTrip(int value) {
+            trip = value;
         }
 };
 
-
-
-class Battery
-{
+/**
+ * Contains methods relating to battery. Should only have one instance.
+*/
+class Battery {
     private:
-
-        int health;
-        int cycles;
         float level = 100.0;
         bool empty = false;
 
-
     public:
-
-        void chargeBattery()
-        {
-            static bool ledState = HIGH;                                //Variable that saves LED state
-            
-            for (byte i = 0; i <= 100; i++) {
-                level = i;
-
-                ledRed(ledState);
-                ledState = !ledState;                                   //Toggles the state
-                delay(400);
-            }
-        }
-
-
-        int getBatteryLevel(float trip, float weight=0)
-        {
+        /**
+         * Calculates battery level based on trip counter and 
+         * turns on red LED on Zumo if battery is under 10 %
+         * 
+         * @param trip the distance traveled since reset in meters
+         * @returns the battery level in percentage
+        */
+        int getBatteryLevel(float trip) {
             static float lastTrip = 0.0;
 
-            level -= (trip-lastTrip)*(275+weight)/275;                  //Calculates the battery level
+            level -= (trip - lastTrip);                                   //Calculates the battery level
             lastTrip = trip;                                            //Saves the last trip
 
             if (level <= 10) {                                          //If the battery level is below 10 %
                 empty = true;                                           //Incremens the trip counter
                 ledRed(HIGH);
+            } else {
+                ledRed(LOW);
             }
 
             return constrain(level, 0, 100);                            //Returns battery level
         }
     
-
-        bool getEmergencyPower()
-        {
+        /**
+         * Used for activating the last 10 % of battery
+         * 
+         * @returns empty the variable storing if battery is under 10 %
+        */
+        bool getEmergencyPower() {
             return empty;                                               //Returns remaining battery level first time under 10 %
         }
 
-
-        void resetEmpty()
-        {
+        /**
+         * Resets empty variable
+        */
+        void resetEmpty() {
             empty = false;
         }
 };
-
-
 
 SelfDriving drive;                                                      //Create object of the four classes
 Interface intf;
 Motion motion;
 Battery battery;
 
-
-
+/**
+ * Should be used for initial setup. Currently empty because
+ * all setup is handled by Interface class
+*/
 void setup() {}
 
-
-
-void loop()
-{
-    float distance;
-    int batteryLevel;
-
+/**
+ * Drives in selected configuration based on command()
+*/
+void loop() {
+    float distance = motion.getTrip();                                  //Gets distance driven
+    int batteryLevel = battery.getBatteryLevel(distance);               //Gets battery level based on distance driven
     int* config = intf.command();
 
     switch (config[0]) {
@@ -931,9 +837,6 @@ void loop()
             break;
 
         case 1:
-            distance = motion.getTrip();                                //Gets distance driven
-            batteryLevel = battery.getBatteryLevel(distance);           //Gets battery level based on distance driven
-
             if (drive.noLineFound());
             else if (config[1] == 0) drive.followLine(batteryLevel);    //Corrects direction based on position
             else drive.followLinePD(250, batteryLevel);
