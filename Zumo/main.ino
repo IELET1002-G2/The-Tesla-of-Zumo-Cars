@@ -420,14 +420,17 @@ class Interface {
          * and configuration if button B is pressed. Intended for command()
         */
         void pause() {
-            motors.setSpeeds(0, 0);
-            print("B:cont", "A/C:conf");
-            
-            while (!buttonB.getSingleDebouncedRelease()) {          //Continues if button B is pressed again.
-                if (releasedAorC()) {                               //Any other button prompts configuration.
-                    enableForceConfig();
-                    break;                                                  
-                }
+            if (buttonB.getSingleDebouncedRelease()) {                  //Pauses if button B is pressed.
+                motors.setSpeeds(0, 0);
+                print("B:cont", "A/C:conf");
+                
+                while (true) {                                          //Continuously checks if somthing happens.
+                    if (buttonB.getSingleDebouncedRelease()) break;     //Continues if button B is pressed again.
+                    if (releasedAorC()) {                               //Any other button prompts configuration.
+                        enableForceConfig();
+                        break;                                                  
+                    }
+                } 
             }
         }
 
@@ -470,9 +473,8 @@ class Interface {
                 Serial.flush();                                         //Waits until incoming buffer can be read.
                 config[menu] = Serial.parseInt();                       //Gets mode or configuration from monitor.
                 return true;                                            //Controls flow if configuration received.
-            } else {
-                return false;
             }
+            else return false;
         };
 
     public:
@@ -502,14 +504,14 @@ class Interface {
                 "PD"        //1: PD regulated
                 };
             
-            if (buttonB.getSingleDebouncedRelease()) pause();           //Pauses if button B is pressed.
+            pause();                                                    //Pauses if button B is pressed.
 
             if (releasedAorC() || forceConfig) {                        //Prompts selection of modes.
                 config[1] = 0;                                          //Resets configuration.
                 
                 if (usbPowerPresent()) {
                     Serial.begin(9600);                                 //Initiates serial monitor.
-                    while (!Serial) continue;                           //Waits for serial monitor to open.
+                    while(!Serial);                                     //Waits for serial monitor to open.
                 }
 
                 if (Serial) {
@@ -530,9 +532,10 @@ class Interface {
                     Serial.parseInt();
                 }
 
-                while (!buttonB.getSingleDebouncedRelease() && !getSerial(0)) { //Continuously checks if somthing happens.                                                     
+                while (true) {                                                  //Continuously checks if somthing happens.                                                     
                     print(MODES[config[0]], "<A B^ C>");                        //Prints current mode.
-                    toggleConfig(0, 1, 6);                                      //Toggles mode.
+                    toggleConfig(0, 1, 6);                                      //Toggles mode.                                                    
+                    if (buttonB.getSingleDebouncedRelease() || getSerial(0)) break;  //Chooses current mode.  
                 }
 
                 if (Serial) {
@@ -570,21 +573,15 @@ class Interface {
                     }
                 }
 
-                if (Serial) {                                                   //Prints confirmation to monitor.
+                if (Serial) {                                           //Prints confirmation to monitor.
                     Serial.print(
                         "\n\nConfiguration done.\n"
-                        "Press button B to confirm.\n"
-                        "Press button A or C to regret.\n\n"
+                        "Press button B to confirm.\n\n"
                         );
                 }
-                print("Ready.", "Press B");
 
-                while (!buttonB.getSingleDebouncedRelease()) {                  //Waits for confirmation
-                    if (releasedAorC()) {                                         //Recurses if A or C is pressed
-                        forceConfig = true;
-                        command();
-                    }
-                }
+                print("Ready.", "Press B");
+                buttonB.waitForRelease();                               //Wait for button B to be pushed.
                 lcd.clear();
             }
             
@@ -676,8 +673,6 @@ class Interface {
         }     
 };
 
-
-
 /**
  * Class containing methods for calculation of speed and displacement. These methods
  * rely on the motor encoders for calculations. Should only declare object once.
@@ -767,10 +762,10 @@ class Motion {
         }
 };
 
-
-
-class Battery
-{
+/**
+ * Contains methods relating to battery. Should only have one instance.
+*/
+class Battery {
     private:
         float level = 100.0;
         bool empty = false;
