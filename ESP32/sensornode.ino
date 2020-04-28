@@ -425,7 +425,7 @@ BLYNK_WRITE(V17) {
  * Interlocked with alarm so user can not interfere servo during alarm
 */
 BLYNK_WRITE(V18) {
-    if (!alarmTrigger) servo.write(param.asInt());
+    if (!alarmTrigger()) servo.write(param.asInt());
 }
 
 /**
