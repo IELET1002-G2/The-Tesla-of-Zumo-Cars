@@ -10,3 +10,6 @@
 ### [Zumo videoer](https://photos.app.goo.gl/AGVcyeoaVNBhz27a7)
 
 ### [Presentasjonsdisposisjon](https://docs.google.com/document/d/1iYhBGElONToYgg7hPcGyvOg6bTejdBx7znM3OR9Mi8I/edit?usp=sharing)
+
+#Tilbakeblikk på prosjektet:
+(https://tenor.com/view/first-iwas-afraid-the-office-michael-scott-steve-carell-cpr-gif-15325468)
