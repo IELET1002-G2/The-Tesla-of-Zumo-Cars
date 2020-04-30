@@ -46,8 +46,6 @@ WebServer server;           // Port is 80 as default
 Adafruit_VL6180X vl;
 Servo servo;
 
-int vbuttonState;  //ONLY FOR TESTIN. REMOVE LATER WHEN NOT NEEDED ANYMORE.
-
 const char* AUTH = "";      // Auth token from Blynk app
 const char* SSID = "";      // Network name
 const char* PASS = "";      // Network password
@@ -437,10 +435,6 @@ BLYNK_WRITE(V19) {
     alarmSystem.nextServoState = param.asInt();
 }
 
-//FOR TESTING PURPOSES ONLY
-BLYNK_WRITE(V21) {
-    vbuttonState = param.asInt();
-}
 
 /**
  * Sends real time and average readings to Blynk server every 1 second.
@@ -488,8 +482,7 @@ void toggleAlarm() {
     static bool resetAlarm;                                         // Interlock to keep alarm from resetting every 500 ms when no alarm
     static bool activateLED = true;                                 // Interlock to prevent weird sensor readings due to continuous blynkAlarmLED.on() call on alarm    
 
-    if (vbuttonState) { //ONLY FOR TESTING. REMOVE LATER AND UNCOMMET NEXT LINE.
-    //if (alarmTrigger()) {                                         // Will go high as soon as two or more alarm levels is reached
+    if (alarmTrigger()) {                                         // Will go high as soon as two or more alarm levels is reached
         alarmSystem.on();                                           // Activate alarm
         resetAlarm = true;
         alarmSystem.servoState = true;
